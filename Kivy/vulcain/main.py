@@ -1259,7 +1259,8 @@ class VulcainApp(App):
         # Instanciation du Popup Kivy
         popup = Popup(
             title="Traitement",
-            separator_height=0,
+            title_size=self.sp(25),
+            #separator_height=0,
             content=root,
             size_hint=(0.8, None),
             auto_dismiss=False,
