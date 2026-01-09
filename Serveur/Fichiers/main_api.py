@@ -1,7 +1,9 @@
 from fastapi import FastAPI, File, UploadFile
+from datetime import datetime
 from PIL import Image
 import io
-import torch
+import os
+
 from analyse_fusee import analyse_image  # ton code existant avec analyse_image()
 
 app = FastAPI()
@@ -11,6 +13,14 @@ async def predict(file: UploadFile = File(...)):
     # Lire l'image envoyée par l'app
     img_bytes = await file.read()
     image = Image.open(io.BytesIO(img_bytes))
+
+    # SAUVEGARDER L'IMAGE REÇUE
+    save_dir = "/home/ubuntu/ml_server/received_images"
+    os.makedirs(save_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_path = f"{save_dir}/photo_{timestamp}.jpg"
+    image.save(save_path)
+    print(f"[API] Image sauvegardée: {save_path}")
     
     print(f"[API] Taille fichier reçu: {len(img_bytes)} bytes")
 
