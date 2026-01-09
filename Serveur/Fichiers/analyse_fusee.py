@@ -465,8 +465,8 @@ def analyse_image(path_image):
         
         # Hypothèse : les mires sont espacées de 1 mètre réel
 
-        DISTANCE_VERTICALE_MIRES = 0.9360 # Distance entre mires haut et bas
-        DISTANCE_HORIZONTALE_MIRES = 0.8135 # Distance entre mires gauche et droite
+        DISTANCE_VERTICALE_MIRES = 0.9 # Distance entre mires haut et bas
+        DISTANCE_HORIZONTALE_MIRES = 0.8 # Distance entre mires gauche et droite
 
         echelle_verticale_gauche = abs(mire_bas_gauche[0] - mire_haut_gauche[0]) / DISTANCE_VERTICALE_MIRES
         echelle_verticale_droite = abs(mire_bas_droite[0] - mire_haut_droite[0]) / DISTANCE_VERTICALE_MIRES
