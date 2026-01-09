@@ -889,6 +889,7 @@ class VulcainApp(App):
                 content=content,
                 size_hint=(0.9, 0.5),
                 title_size=self.sp(25),
+                auto_dismiss=False,
             )
 
             # Définition des actions internes au popup
@@ -918,26 +919,53 @@ class VulcainApp(App):
             self.afficher_message_temporaire(texte, couleur)
 
     def _ouvrir_camera_android(self):
-        """Invoque l'application caméra par défaut d'Android via un Intent."""
         if platform == "android":
             try:
-                # Récupération de l'activité
+                from jnius import autoclass, cast
+                
+                Intent = autoclass('android.content.Intent')
+                MediaStore = autoclass('android.provider.MediaStore')
+                Uri = autoclass('android.net.Uri')
+                File = autoclass('java.io.File')
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                FileProvider = autoclass('androidx.core.content.FileProvider')
+                Parcelable = autoclass('android.os.Parcelable')
+                
                 current_activity = PythonActivity.mActivity
-                # Création de l'Intent de capture d'image
-                intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                # Lancement de l'appareil photo en attendant un résultat
-                current_activity.startActivityForResult(
-                    intent, self.REQUEST_IMAGE_CAPTURE
+                
+                # Créer un fichier
+                temp_dir = current_activity.getExternalFilesDir(None)
+                photo_file = File(temp_dir, f"fusee_{int(time.time() * 1000)}.jpg")
+                self.temp_photo_path = str(photo_file.getAbsolutePath())
+                print(f"[CAMERA] Type de temp_photo_path: {type(self.temp_photo_path)}")
+                print(f"[CAMERA] Valeur: {self.temp_photo_path}")
+
+                # Utiliser FileProvider
+                authority = current_activity.getPackageName() + ".fileprovider"
+                photo_uri = FileProvider.getUriForFile(
+                    current_activity,
+                    authority,
+                    photo_file
                 )
+                
+                # Cast en Parcelable pour putExtra
+                photo_uri_parcelable = cast('android.os.Parcelable', photo_uri)
+                
+                # Intent
+                intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, photo_uri_parcelable)
+                
+                # Ajouter les permissions
+                intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                
+                current_activity.startActivityForResult(intent, self.REQUEST_IMAGE_CAPTURE)
                 print("[CAMERA] Camera intent started")
+                
             except Exception as e:
-                # Gestion des erreurs d'accès matériel
                 print(f"[CAMERA] ERREUR: {e}")
-                couleur = "ff0000"
-                texte = "ERREUR CAMÉRA..."
-                self.texte_base = texte
-                self.couleur = couleur
-                self.afficher_message_temporaire(texte, couleur)
+                import traceback
+                traceback.print_exc()
 
     def _ouvrir_galerie_android(self):
         """Ouvre le sélecteur de fichiers du système pour choisir une image."""
@@ -996,121 +1024,35 @@ class VulcainApp(App):
             pass
 
     def _traiter_resultat_camera(self, intent_data):
-        """Gère l'extraction du bitmap, son redimensionnement et sa sauvegarde disque."""
-        print("[CAMERA] Extraction du bitmap...")
-
-        bitmap = None
-        scaled_bitmap = None
-        temp_path = None
-        output = None
-
+        """Charge directement la photo haute résolution depuis le fichier."""
+        print("[CAMERA] Chargement de la photo...")
+        
         try:
-            # Extraction du petit aperçu (thumbnail) fourni par défaut par l'Intent Camera
-            extras = intent_data.getExtras()
-            bitmap = extras.get("data") if extras else None
-
-            if bitmap is None:
-                # Erreur si l'image n'est pas trouvée dans les extras
-                couleur = "ff0000"
-                texte = "PAS DE BITMAP..."
-                self.texte_base = texte
-                self.couleur = couleur
-                self.afficher_message_temporaire(texte, couleur)
-                return
-
-            # --- 1. Redimensionnement pour économiser la RAM ---
-            width = bitmap.getWidth()
-            height = bitmap.getHeight()
-            max_dimension = 2000
-
-            # Vérification si l'image dépasse la limite de sécurité
-            if width > max_dimension or height > max_dimension:
-                scale = max_dimension / float(max(width, height))
-                new_width = int(width * scale)
-                new_height = int(height * scale)
-                # Création d'une version réduite
-                scaled_bitmap = Bitmap.createScaledBitmap(
-                    bitmap, new_width, new_height, True
-                )
-                # Libération immédiate de la mémoire de l'original
-                bitmap.recycle()
-                bitmap = None
-            else:
-                scaled_bitmap = bitmap
-                bitmap = None
-
-            # --- 2. Sauvegarde sur le disque ---
-            temp_dir = tempfile.gettempdir()
-            # Génération d'un nom de fichier unique basé sur le timestamp
-            temp_path = os.path.join(temp_dir, f"fusee_{int(time.time() * 1000)}.jpg")
-
-            # Ouverture d'un flux d'écriture vers le fichier
-            output = FileOutputStream(temp_path)
-            # Compression agressive (40%) pour optimiser le traitement ultérieur
-            result = scaled_bitmap.compress(CompressFormat.JPEG, 40, output)
-            output.flush()
-            output.close()
-            output = None
-
-            if not result:
-                # Erreur si la compression a échoué
-                couleur = "ff0000"
-                texte = "ERREUR COMPRESSION..."
-                self.texte_base = texte
-                self.couleur = couleur
-                self.afficher_message_temporaire(texte, couleur)
-                return
-
-            # --- 3. Vérification de l'existence du fichier ---
-            time.sleep(0.5)
-
-            if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+            # La photo est déjà sauvegardée dans self.temp_photo_path
+            if not hasattr(self, 'temp_photo_path') or not os.path.exists(self.temp_photo_path):
                 couleur = "ff0000"
                 texte = "PHOTO INTROUVABLE..."
                 self.texte_base = texte
                 self.couleur = couleur
                 self.afficher_message_temporaire(texte, couleur)
                 return
-
-            print(f"[CAMERA] Fichier sauvegardé: {temp_path}")
-
-            # --- 4. Nettoyage mémoire ---
-            scaled_bitmap.recycle()
-            scaled_bitmap = None
-            gc.collect()
-
-            # --- 5. Validation par Pillow ---
-            self._traiter_image_valider_chemin(temp_path)
-
+            
+            print(f"[CAMERA] Photo trouvée: {self.temp_photo_path}")
+            print(f"[CAMERA] Taille fichier: {os.path.getsize(self.temp_photo_path)} bytes")
+            
+            # Passer le chemin à la validation
+            self._traiter_image_valider_chemin(self.temp_photo_path)
+            
         except Exception as e:
-            # Gestion des erreurs système graves lors de la manipulation du bitmap
-            print(f"[CAMERA] ERREUR CRITIQUE: {e}")
+            print(f"[CAMERA] ERREUR: {e}")
             import traceback
-
             print(traceback.format_exc())
             couleur = "ff0000"
-            texte = "ERREUR CRITIQUE..."
+            texte = "ERREUR CHARGEMENT..."
             self.texte_base = texte
             self.couleur = couleur
             self.afficher_message_temporaire(texte, couleur)
-
         finally:
-            # Garantie de fermeture des flux et libération des ressources Java
-            if output:
-                try:
-                    output.close()
-                except:
-                    pass
-            if bitmap:
-                try:
-                    bitmap.recycle()
-                except:
-                    pass
-            if scaled_bitmap:
-                try:
-                    scaled_bitmap.recycle()
-                except:
-                    pass
             gc.collect()
 
     def _traiter_image_valider_chemin(self, file_path):
@@ -1260,7 +1202,7 @@ class VulcainApp(App):
         popup = Popup(
             title="Traitement",
             title_size=self.sp(25),
-            #separator_height=0,
+            # separator_height=0,
             content=root,
             size_hint=(0.8, None),
             auto_dismiss=False,
@@ -1304,15 +1246,8 @@ class VulcainApp(App):
     def _calcul_stabilite_thread(self):
         """Exécute les algorithmes lourds d'extraction d'image en arrière-plan."""
         try:
-            # Ouverture de l'image pour analyse
-            img = Image.open(self.chemin_image_fusee)
-
-            # Appel au module métier pour extraire les contours et dimensions
-            self.donnees_completes, image_cone = shapeExtraction.dimensions(img)
-            import numpy as np
-
-            # Libération immédiate de l'image et appel du GC
-            img = None
+            # Appel au module métier - passe le chemin directement
+            self.donnees_completes, image_cone = shapeExtraction.dimensions(self.chemin_image_fusee)
             gc.collect()
 
             # Analyse spécifique de la pointe (ogive)
@@ -1627,6 +1562,7 @@ class VulcainApp(App):
             content=content,
             size_hint=(0.9, None),
             title_size=self.sp(25),
+            auto_dismiss=False,
         )
         content.do_layout()
         # Ajustement de la hauteur du popup selon le contenu sans dépasser l'écran
@@ -1904,6 +1840,7 @@ class VulcainApp(App):
             content=scroll_view,
             size_hint=(0.9, 0.9),
             title_size=self.sp(25),
+            auto_dismiss=False,
         )
 
         # Restauration du label d'info
@@ -2010,6 +1947,7 @@ class VulcainApp(App):
             content=content,
             size_hint=(0.9, 0.9),
             title_size=self.sp(25),
+            auto_dismiss=False,
         )
 
         def sauvegarder_identifiants(btn_instance):
