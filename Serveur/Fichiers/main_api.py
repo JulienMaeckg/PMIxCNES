@@ -1,7 +1,8 @@
 from fastapi import FastAPI, File, UploadFile
-from analyse_fusee import analyse_image
 from PIL import Image
 import io
+import torch
+from analyse_fusee import analyse_image  # ton code existant avec analyse_image()
 
 app = FastAPI()
 
@@ -10,6 +11,22 @@ async def predict(file: UploadFile = File(...)):
     # Lire l'image envoyée par l'app
     img_bytes = await file.read()
     image = Image.open(io.BytesIO(img_bytes))
+    
+    print(f"[API] Taille fichier reçu: {len(img_bytes)} bytes")
+
+    # --- ROTATION MANUELLE ---
+    # On récupère largeur (w) et hauteur (h)
+    w, h = image.size
+    print(f"[API] Dimensions image: {w}x{h}")
+    print(f"[API] Mode image: {image.mode}")
+    
+    # Si la largeur est supérieure à la hauteur, l'image est "couchée"
+    if w > h:
+        # On pivote de 90° vers la droite (ou -90 vers la gauche) 
+        # pour la remettre debout
+        image = image.rotate(-90, expand=True)
+        print(f"[API] Image pivotée: {image.size}")
+    # --------------------------
 
     # Appeler ton code d'analyse
     (
