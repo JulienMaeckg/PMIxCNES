@@ -4,18 +4,30 @@ import requests
 import io
 
 
+def load_full_resolution_image(path):
+    """Charge l'image directement sans gestion MPF."""
+    print(f"[SHAPE] Chargement simple de: {path}")
+    img = Image.open(path)
+    img.load()
+    print(f"[SHAPE] Image chargée: {img.size}, mode: {img.mode}")
+    return img
+
+
 def resize_image(img, max_size=2000):
     """Redimensionne proprement l'image avant l'envoi pour limiter la bande passante."""
+    
+    # --- CORRECTION MAJEURE ---
+    # On force la conversion en RGB via Pillow dès le début.
+    # Cela corrige le bug où les photos Android étaient vues comme des matrices 
+    # de gris (2D) ou des palettes (P) par NumPy.
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    
     # Conversion de l'objet PIL en tableau NumPy
     img_array = np.array(img)
 
-    # Conversion forcée en RGB si l'image est en niveaux de gris (2 dimensions)
-    if len(img_array.shape) == 2:
-        img_array = np.stack([img_array] * 3, axis=-1)
-
-    # Suppression du canal de transparence (Alpha) si présent pour compatibilité JPEG
-    if img_array.shape[2] == 4:
-        img_array = img_array[:, :, :3]
+    # Note : Le bloc "if len(img_array.shape) == 2" est supprimé car
+    # img.convert('RGB') garantit que nous avons maintenant 3 dimensions (Couleurs).
 
     # Récupération des dimensions actuelles
     height, width = img_array.shape[:2]
@@ -54,16 +66,25 @@ def dimensions(img):
     try:
         # Préparation de l'image (Chargement et Redimensionnement)
         if isinstance(img, Image.Image):
+            print(f"[SHAPE] Image PIL reçue: {img.size}, mode: {img.mode}")
             img_to_send = resize_image(img)
         elif isinstance(img, str):
-            img_to_send = resize_image(Image.open(img))
+            print(f"[SHAPE] Chemin reçu: {img}")
+            img_loaded = load_full_resolution_image(img)
+            print(f"[SHAPE] Image chargée: {img_loaded.size}, mode: {img_loaded.mode}")
+            img_to_send = resize_image(img_loaded)
         else:
             raise ValueError("img doit être une Image PIL ou un chemin de fichier")
 
+        print(f"[SHAPE] Image après resize: {img_to_send.size}")
+
         # Conversion de l'image en flux binaire (mémoire vive) au format JPEG
         img_bytes = io.BytesIO()
-        img_to_send.save(img_bytes, format="JPEG")
+        img_to_send.save(img_bytes, format="JPEG", quality=95)
         img_bytes.seek(0)  # Remise à zéro du curseur de lecture
+
+        print(f"[SHAPE] Taille du fichier à envoyer: {len(img_bytes.getvalue())} bytes")
+
         # Préparation du dictionnaire de fichiers pour la requête HTTP POST
         files = {"file": ("image.jpg", img_bytes, "image/jpeg")}
 
