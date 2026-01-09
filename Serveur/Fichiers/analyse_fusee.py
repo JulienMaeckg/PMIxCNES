@@ -392,9 +392,26 @@ def analyse_image(path_image):
         # Sélection des 4 plus gros groupes (les vraies mires)
         # ─────────────────────────────────────────────────────────────────────────
 
-        sizes = [np.sum(labeled_array == i) for i in range(1, num_features+1)]    # On calcule la taille (nombre de pixels) de chaque groupe
-        sorted_labels = [i+1 for i in np.argsort(sizes)[::-1]]    # On trie les groupes par taille décroissante
-        top_4_labels = sorted_labels[:4]    # On garde seulement les 4 plus gros
+        # Pour chaque groupe, on calcule sa distance minimale aux bords gauche et droit
+        edge_distances = []
+        width = labeled_array.shape[1]  # Largeur de l'image
+
+        for i in range(1, num_features + 1):
+            # Trouve les coordonnées de tous les pixels du groupe i
+            coords = np.argwhere(labeled_array == i)
+            # coords[:, 1] contient les coordonnées x (colonnes)
+            x_coords = coords[:, 1]
+            
+            # Distance minimale au bord gauche (x=0) ou droit (x=width-1)
+            min_dist_left = np.min(x_coords)
+            min_dist_right = width - 1 - np.max(x_coords)
+            min_edge_distance = min(min_dist_left, min_dist_right)
+            
+            edge_distances.append(min_edge_distance)
+
+        # On trie les groupes par distance croissante aux bords (les plus proches en premier)
+        sorted_labels = [i + 1 for i in np.argsort(edge_distances)]
+        top_4_labels = sorted_labels[:4]  # On garde les 4 plus proches des bords
 
         
         # On crée maitenant un masque nettoyé avec seulement les 4 plus gros groupes
@@ -448,8 +465,8 @@ def analyse_image(path_image):
         
         # Hypothèse : les mires sont espacées de 1 mètre réel
 
-        DISTANCE_VERTICALE_MIRES = 1 # Distance entre mires haut et bas
-        DISTANCE_HORIZONTALE_MIRES = 1 # Distance entre mires gauche et droite
+        DISTANCE_VERTICALE_MIRES = 0.9360 # Distance entre mires haut et bas
+        DISTANCE_HORIZONTALE_MIRES = 0.8135 # Distance entre mires gauche et droite
 
         echelle_verticale_gauche = abs(mire_bas_gauche[0] - mire_haut_gauche[0]) / DISTANCE_VERTICALE_MIRES
         echelle_verticale_droite = abs(mire_bas_droite[0] - mire_haut_droite[0]) / DISTANCE_VERTICALE_MIRES
@@ -564,14 +581,13 @@ def analyse_image(path_image):
             x_moyen_aileron = x_moyen_fuselage
         
         
-
         # ─────────────────────────────────────────────────────────────────────────
         # Conversion des longueurs en mètres
         # ─────────────────────────────────────────────────────────────────────────
 
         # Calcul du facteur de correction du au fait que la fusée et le fond 
         # ne sont pas dans le meme plan
-        facteur = facteur_correction(1.2, 0.13)  # Hypothèse appareil photo a 1.20 m du fond, et fusée séparé de 13 cm du fond
+        facteur = facteur_correction(1.00, 0.20)  # Hypothèse appareil photo a 1.00 m du fond, et fusée séparé de 20 cm du fond
  
         # FUSELAGE
         echelle_vert_fuselage = calculer_echelle_verticale_locale(y_moyen_fuselage, x_moyen_fuselage)
