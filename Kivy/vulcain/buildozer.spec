@@ -13,7 +13,7 @@ package.domain = org.vulcain
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,jpeg,kv,atlas
+source.include_exts = py,png,jpg,jpeg,kv,atlas,xml
 
 # (list) List of inclusions using pattern matching
 # source.include_patterns = assets/*,images/*.png
@@ -151,7 +151,7 @@ android.api = 34
 
 # (str) Extra xml to write directly inside the <manifest><application> tag of AndroidManifest.xml
 # use that parameter to provide a filename from where to load your custom XML arguments:
-# android.extra_manifest_application_xml = %(source.dir)s/android_manifest_extra.xml
+android.extra_manifest_application_xml = %(source.dir)s/manifest_application_extra.xml
 
 # (str) Full name including package path of the Java class that implements Python Service
 # use that parameter to set custom Java class which extends PythonService
@@ -177,7 +177,7 @@ android.api = 34
 
 # (list) List of Java files to add to the android project (can be java or a
 # directory containing the files)
-#android.add_src =
+android.add_src = src
 
 # (list) Android AAR archives to add
 #android.add_aars =
@@ -198,10 +198,10 @@ android.api = 34
 # 3) A directory, here 'legal_resources' must contain one or more directories, 
 # each of a resource kind:  drawable, xml, etc...
 # android.add_resources = legal_resources
-#android.add_resources =
+# android.add_resources = resources
 
 # (list) Gradle dependencies to add
-android.gradle_dependencies = androidx.core:core:1.9.0
+android.gradle_dependencies = androidx.core:core:1.6.0
 
 # (bool) Enable AndroidX support. Enable when 'android.gradle_dependencies'
 # contains an 'androidx' package, or any package from Kotlin source.
@@ -239,7 +239,7 @@ android.enable_androidx = True
 android.manifest.intent_filters = manifest_pmi.xml
 
 # (list) Copy these files to src/main/res/xml/ (used for example with intent-filters)
-# android.res_xml = xml/file_paths.xml
+android.res_xml = src/main/res/xml/file_paths.xml
 
 # (str) launchMode to set for the main activity
 android.manifest.launch_mode = singleTask
@@ -333,7 +333,7 @@ android.allow_backup = True
 #p4a.local_recipes =
 
 # (str) Filename to the hook for p4a
-#p4a.hook =
+# p4a.hook = 
 
 # (str) Bootstrap to use for android builds
 # p4a.bootstrap = sdl2
