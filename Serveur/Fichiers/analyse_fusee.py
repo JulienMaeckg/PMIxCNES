@@ -620,7 +620,7 @@ def analyse_image(path_image):
 
     # Calcul du facteur de correction du au fait que la fusée et le fond 
     # ne sont pas dans le meme plan
-    facteur = facteur_correction(1.0, 0.20)  # Hypothèse appareil photo a 1.20 m du fond, et fusée séparé de 13 cm du fond
+    facteur = facteur_correction(1.20, 0.20)  # Hypothèse appareil photo a 1.20 m du fond, et fusée séparé de 13 cm du fond
 
     # FUSELAGE
     echelle_vert_fuselage = calculer_echelle_verticale_locale(y_moyen_fuselage, x_moyen_fuselage)
