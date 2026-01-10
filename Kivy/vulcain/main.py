@@ -130,31 +130,6 @@ def open_website(url):
         # Affichage de l'erreur en cas d'échec d'ouverture du navigateur
         print("Erreur ouverture site :", e)
 
-
-def get_code_from_SPOCK(id_, key):
-    """Interroge l'API SPOCK pour obtenir un code de session à partir des identifiants."""
-    try:
-        # Construction de l'URL de l'API avec les paramètres fournis
-        url = f"https://www.planete-sciences.org/espace/SPOCK/api.html?object=stabtraj&id={id_}&key={key}"
-        # Envoi d'une requête GET HTTP
-        r = requests.get(url)
-        # Vérification du succès de la requête
-        if r.status_code == 200:
-            # Extraction du contenu JSON
-            data = r.json()
-            # Récupération de la valeur associée à la clé "code"
-            code = data.get("code", "")
-            return code
-        else:
-            # Affichage de l'erreur HTTP si le serveur répond négativement
-            print(f"Erreur récupération code: {r.status_code}")
-            return None
-    except Exception as e:
-        # Gestion des erreurs de connexion ou d'analyse JSON
-        print(f"Erreur request code: {e}")
-        return None
-
-
 class RoundedButton(Button):
     """Classe personnalisée créant un bouton avec des coins arrondis et un fond coloré."""
 
@@ -308,9 +283,8 @@ class VulcainApp(App):
         # Initialisation des variables de stockage des identifiants SPOCK
         self.SPOCK_id = ""
         self.SPOCK_key = ""
-        self.SPOCK_code = ""
         # Mémoire des derniers identifiants pour éviter les doublons de traitement
-        self.derniers_identifiants_recus = {"id": "", "key": "", "code": ""}
+        self.derniers_identifiants_recus = {"id": "", "key": ""}
         # Flags de contrôle pour la gestion des Intents asynchrones
         self.intent_en_cours_de_traitement = False
         self.dernier_intent_traite = None
@@ -545,9 +519,9 @@ class VulcainApp(App):
             link = on_new_intent(intent)
 
             # Évite de traiter deux fois exactement le même lien
-            if link == self.dernier_intent_traite:
-                print("[INTENT] Intent déjà traité, ignoré")
-                return
+            # if link == self.dernier_intent_traite:
+                # print("[INTENT] Intent déjà traité, ignoré")
+                # return
 
             # Valide s'il s'agit d'un lien SPOCK et lance le traitement
             if link and self._is_spock_link(link):
@@ -620,7 +594,7 @@ class VulcainApp(App):
 
             # Vérification de la présence d'au moins un paramètre d'identification
             params = parse_qs(parsed.query)
-            has_spock_params = any(param in params for param in ["id", "key", "code"])
+            has_spock_params = any(param in params for param in ["id", "key"])
 
             print(f"[INTENT] Paramètres trouvés: {list(params.keys())}")
             print(f"[INTENT] A des paramètres SPOCK: {has_spock_params}")
@@ -632,6 +606,17 @@ class VulcainApp(App):
             print(f"[INTENT] Erreur validation lien: {e}")
             return False
 
+    def update_spock_button_color(self):
+            """Change la couleur du texte du bouton SPOCK en bleu si ID et KEY sont présents."""
+            if self.SPOCK_id and self.SPOCK_key:
+                # Bleu si les deux sont remplis
+                self.bouton_identifiants.color = (0, 0, 1, 1) 
+                self.bouton_identifiants.bold = True
+            else:
+                # Noir sinon
+                self.bouton_identifiants.color = (0, 0, 0, 1)
+                self.bouton_identifiants.bold = False
+
     def process_SPOCK_link(self, link):
         """Extrait les identifiants d'un lien validé et met à jour l'application."""
 
@@ -642,13 +627,12 @@ class VulcainApp(App):
         # Récupération sécurisée des valeurs (prend la première occurrence ou vide)
         new_id = params.get("id", [""])[0]
         new_key = params.get("key", [""])[0]
-        new_code = params.get("code", [""])[0]
 
         print(
-            f"[SPOCK] Traitement du lien - ID: {new_id}, Key: {new_key}, Code: {new_code}"
+            f"[SPOCK] Traitement du lien - ID: {new_id}, Key: {new_key}"
         )
 
-        if new_id or new_key or new_code:
+        if new_id or new_key:
             # Détection de changements par rapport aux données en mémoire
             id_changed = (
                 new_id != "" and new_id != self.derniers_identifiants_recus["id"]
@@ -656,12 +640,9 @@ class VulcainApp(App):
             key_changed = (
                 new_key != "" and new_key != self.derniers_identifiants_recus["key"]
             )
-            code_changed = (
-                new_code != "" and new_code != self.derniers_identifiants_recus["code"]
-            )
 
             # Mise à jour des variables si des données fraîches sont présentes
-            if id_changed or key_changed or code_changed:
+            if id_changed or key_changed:
                 print(f"[SPOCK] Changement détecté - Affichage du message")
 
                 if new_id:
@@ -670,25 +651,12 @@ class VulcainApp(App):
                 if new_key:
                     self.SPOCK_key = new_key
                     self.derniers_identifiants_recus["key"] = new_key
-                if new_code:
-                    self.SPOCK_code = new_code
-                    self.derniers_identifiants_recus["code"] = new_code
 
-            # Notification visuelle de la réception des données
-            self.infos_label.text = "[b][color=0000ff]IDENTIFIANTS REÇUS ![/color][/b]"
-
-            # Planification du retour à l'état d'affichage normal après 2.5s
-            Clock.schedule_once(
-                lambda dt: setattr(
-                    self.infos_label,
-                    "text",
-                    f"[b][color={self.couleur}]{self.texte_base}[/color][/b]",
-                ),
-                2.5,
-            )
+            # Mise à jour de la couleur du bouton au lieu du texte d'info
+            self.update_spock_button_color()
 
             print(
-                f"[SPOCK] Identifiants actuels - ID: {self.SPOCK_id}, Key: {self.SPOCK_key}, Code: {self.SPOCK_code}"
+                f"[SPOCK] Identifiants actuels - ID: {self.SPOCK_id}, Key: {self.SPOCK_key}"
             )
 
     def _traiter_intent_spock(self, link):
@@ -811,9 +779,10 @@ class VulcainApp(App):
         # Effacement des identifiants
         self.SPOCK_key = ""
         self.SPOCK_id = ""
-        self.SPOCK_code = ""
-        self.derniers_identifiants_recus = {"id": "", "key": "", "code": ""}
-        self.dernier_intent_traite = None
+        self.derniers_identifiants_recus = {"id": "", "key": ""}
+        # Remise en noir du bouton
+        self.update_spock_button_color()
+        self.intent_en_cours_de_traitement = False
 
         # Suppression sécurisée du fichier image temporaire stocké sur l'appareil
         if self.chemin_image_fusee and os.path.exists(self.chemin_image_fusee):
@@ -1650,7 +1619,7 @@ class VulcainApp(App):
         )
         content.add_widget(section_utilisation)
 
-        # Texte descriptif des étapes (BBcode Kivy utilisé)
+        # Texte descriptif des étapes 
         texte_utilisation = Label(
             text="1- Sélectionner le nombre d'ailerons.\n\n"
             '2- Cliquez sur [b]"Scanner fusée"[/b]. Choisissez comment vous voulez importer l\'image de votre fusée (prendre une photo ou choisir depuis la galerie).\n\n'
@@ -1891,33 +1860,6 @@ class VulcainApp(App):
         )
         content.add_widget(key_input)
 
-        # --- Champ Code ---
-        code_label = Label(
-            text="Code (optionnel) :",
-            font_size=self.sp(27),
-            color=(0, 0, 0, 1),
-            size_hint_y=0.1,
-        )
-        content.add_widget(code_label)
-        code_input = TextInput(
-            text=self.SPOCK_code,
-            font_size=self.sp(27),
-            multiline=False,
-            size_hint_y=0.1,
-            foreground_color=(0, 0, 0, 1),
-        )
-        content.add_widget(code_input)
-
-        # Bouton de sauvegarde locale
-        btn_sauvegarder = RoundedButton(
-            text="Sauvegarder les identifiants",
-            size_hint_y=0.1,
-            background_color=(0.2, 0.6, 1, 1),
-            font_size=self.sp(25),
-            color=(1, 1, 1, 1),
-        )
-        content.add_widget(btn_sauvegarder)
-
         # Zone de feedback
         message_label = Label(
             text="",
@@ -1928,15 +1870,15 @@ class VulcainApp(App):
         )
         content.add_widget(message_label)
 
-        # Bouton pour redirection web
-        btn_ouvrir_SPOCK = RoundedButton(
-            text="Ouvrir la page SPOCK",
+        # Bouton de sauvegarde locale
+        btn_sauvegarder = RoundedButton(
+            text="Sauvegarder les identifiants",
             size_hint_y=0.1,
-            background_color=(0.8, 0.4, 0, 1),
+            background_color=(0.2, 0.6, 1, 1),
             font_size=self.sp(25),
             color=(1, 1, 1, 1),
         )
-        content.add_widget(btn_ouvrir_SPOCK)
+        content.add_widget(btn_sauvegarder)
 
         # Bouton fermeture
         btn_fermer = RoundedButton(
@@ -1951,7 +1893,7 @@ class VulcainApp(App):
         popup = Popup(
             title="Identifiants SPOCK",
             content=content,
-            size_hint=(0.9, 0.9),
+            size_hint=(0.9, 0.63),
             title_size=self.sp(25),
             auto_dismiss=False,
         )
@@ -1967,57 +1909,19 @@ class VulcainApp(App):
 
                 self.SPOCK_id = id_input.text.strip()
                 self.SPOCK_key = key_input.text.strip()
-                self.SPOCK_code = code_input.text.strip()
                 # Synchronisation avec la mémoire "Intent"
                 self.derniers_identifiants_recus["id"] = self.SPOCK_id
                 self.derniers_identifiants_recus["key"] = self.SPOCK_key
-                self.derniers_identifiants_recus["code"] = self.SPOCK_code
                 message_label.text = (
                     "[b][color=00FF00]IDENTIFIANTS SAUVEGARDÉS ![/color][/b]"
                 )
+                # AJOUTER CETTE LIGNE ICI :
+                self.update_spock_button_color()
 
             Clock.schedule_once(executer_sauvegarde, 0.6)
 
-        def ouvrir_SPOCK(btn_instance):
-            """Action d'ouverture de l'URL SPOCK avec le code fourni."""
-            message_label.text = "[i][color=000000]En cours...[/color][/i]"
-
-            def executer_ouverture(dt):
-                # Détermination du code à utiliser (priorité au champ texte)
-                code_a_utiliser = (
-                    self.SPOCK_code
-                    if self.SPOCK_code != ""
-                    else code_input.text.strip()
-                )
-
-                if code_a_utiliser == "":
-                    # Erreur si aucun code n'est renseigné
-                    btn_instance._bg_color = (0.8, 0.4, 0, 1)
-                    btn_instance.bg_color.rgba = (0.8, 0.4, 0, 1)
-                    message_label.text = "[b][color=FF0000]CODE MANQUANT...[/color][/b]"
-                    return
-
-                btn_instance._bg_color = (0.8, 0.4, 0, 1)
-                btn_instance.bg_color.rgba = (0.8, 0.4, 0, 1)
-                message_label.text = "[b][color=0000ff]OUVERTURE DE SPOCK ![/color][/b]"
-
-                def ouvrir_url(dt):
-                    # Construction de l'URL finale et lancement du navigateur
-                    url = f"https://www.planete-sciences.org/espace/spock/stabtraj.html?code={code_a_utiliser}"
-                    open_website(url)
-
-                Clock.schedule_once(ouvrir_url, 1.0)
-
-            Clock.schedule_once(executer_ouverture, 0.6)
-
-        def ouvrir_SPOCK_et_sauvegarder(btn_instance):
-            """Chaîne les deux actions de sauvegarde et d'ouverture."""
-            sauvegarder_identifiants(btn_instance)
-            ouvrir_SPOCK(btn_instance)
-
         # Liaison des fonctions aux boutons du popup
         btn_sauvegarder.bind(on_release=sauvegarder_identifiants)
-        btn_ouvrir_SPOCK.bind(on_release=ouvrir_SPOCK_et_sauvegarder)
         btn_fermer.bind(on_release=popup.dismiss)
 
         popup.open()
