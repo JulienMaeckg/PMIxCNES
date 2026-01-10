@@ -95,20 +95,9 @@ def dimensions(img):
         if response.status_code == 200:
             data = response.json()
 
-            # Extraction de la matrice de l'ogive (list) pour la traiter séparément
-            img_ogive_list = data.pop("img_ogive")
-            # Nettoyage des métadonnées de forme inutiles ici
-            data.pop("img_ogive_shape", None)
-
-            # Stockage des dimensions extraites (le dictionnaire principal)
-            Donnes = data
-
-            # Reconversion de la liste JSON en véritable matrice numérique NumPy
-            img_ogive = np.array(img_ogive_list)
-
-            print("[SHAPE] Données et matrice reçues du serveur avec succès")
-            # Retourne les deux éléments nécessaires à la suite du calcul
-            return Donnes["donnees"], img_ogive
+            print("[SHAPE] Données reçues du serveur avec succès")
+            
+            return data
         else:
             # En cas d'erreur serveur (ex: 500), affiche le message d'erreur
             print(f"[SHAPE] Erreur {response.status_code} : {response.text}")
