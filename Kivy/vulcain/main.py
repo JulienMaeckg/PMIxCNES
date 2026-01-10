@@ -26,7 +26,6 @@ import os
 
 # Importation des modules locaux
 import shapeExtraction
-import noseConeShape
 import spockApi
 
 # Bloc conditionnel pour les fonctionnalités spécifiques au système Android
@@ -1217,13 +1216,9 @@ class VulcainApp(App):
         """Exécute les algorithmes lourds d'extraction d'image en arrière-plan."""
         try:
             # Appel au module métier - passe le chemin directement
-            self.donnees_completes, image_cone = shapeExtraction.dimensions(self.chemin_image_fusee)
+            self.donnees_completes = shapeExtraction.dimensions(self.chemin_image_fusee)
             gc.collect()
-
-            # Analyse spécifique de la pointe (ogive)
-            self.donnees_completes["Forme_ogive"] = noseConeShape.noseConeType(
-                image_cone
-            )
+            
             # Récupération des valeurs saisies dans l'UI
             self.donnees_completes["Q_ail"] = int(self.aileron_bas_spinner.text)
             self.donnees_completes["Q_can"] = 0
