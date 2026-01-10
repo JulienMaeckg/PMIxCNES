@@ -52,7 +52,7 @@ def calculer_regression_R2(contour_x, contour_y):
     return R2, a
 
 
-def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.45):
+def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.60):
     """Classifie la pointe de la fusée en 0 (Parabolique), 1 (Ogivale) ou 2 (Conique)."""
     # Extraction du contour depuis la matrice binaire
     contour_x, contour_y = detecter_contour(matrice)
@@ -94,15 +94,15 @@ def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.45):
         type_arc = 2
     else:
         # Analyse de la courbure à la pointe pour distinguer Parabolique d'Ogivale
-        num_points_gauche_pointe = 15
-        num_points_droite_pointe = 15
+        num_points_gauche_pointe = 22
+        num_points_droite_pointe = 22
 
         # Extraction des points situés juste autour du sommet
-        x_gauche_pointe = x_gauche[idx_pointe - num_points_gauche_pointe + 1 :]
-        y_gauche_pointe = y_gauche[idx_pointe - num_points_gauche_pointe + 1 :]
-
-        x_droite_pointe = x_droite[:num_points_droite_pointe]
-        y_droite_pointe = y_droite[:num_points_droite_pointe]
+        x_gauche_pointe = x_gauche[idx_pointe-num_points_gauche_pointe+1:idx_pointe-4]
+        y_gauche_pointe = y_gauche[idx_pointe-num_points_gauche_pointe+1:idx_pointe-4]
+        
+        x_droite_pointe = x_droite[5:num_points_droite_pointe]
+        y_droite_pointe = y_droite[5:num_points_droite_pointe]
 
         # Calcul de la pente locale des deux côtés de la pointe
         _, a = calculer_regression_R2(x_gauche_pointe, y_gauche_pointe)
