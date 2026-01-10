@@ -813,6 +813,7 @@ class VulcainApp(App):
         self.SPOCK_id = ""
         self.SPOCK_code = ""
         self.derniers_identifiants_recus = {"id": "", "key": "", "code": ""}
+        self.dernier_intent_traite = None
 
         # Suppression sécurisée du fichier image temporaire stocké sur l'appareil
         if self.chemin_image_fusee and os.path.exists(self.chemin_image_fusee):
@@ -1566,7 +1567,7 @@ class VulcainApp(App):
         )
         content.do_layout()
         # Ajustement de la hauteur du popup selon le contenu sans dépasser l'écran
-        popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.95)
+        popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.9)
 
         # Mise à jour du statut global pour l'envoi
         couleur = "00ff00"
@@ -1698,10 +1699,15 @@ class VulcainApp(App):
 
         texte_prise_vue = Label(
             text="Pour obtenir le meilleur résultat possible, merci de faire en sorte que votre photo respecte les points suivants :\n\n"
-            "• Fond uni et lisse d'une couleur différente de celles présentes sur la fusée\n\n"
+            "• Le fond doit être uni et lisse d'une couleur différente de celles présentes sur la fusée\n\n"
             "• Les 4 mires doivent être complètement visibles\n\n"
-            "• Cadrez l'image de telle sorte à ce que le fond soit le même partout\n\n"
-            "• Fusée centrée et bien verticale\n\n"
+            "• Les 4 mires doivent être toutes de la même couleur\n\n"
+            "• Les mires ne doivent pas être de la même couleur que celle du fond\n\n"
+            "• Les mires doivent être espacées de 90 cm verticalement par rapport à leurs centres\n\n"
+            "• Les mires doivent être espacées de 80 cm horizontalement par rapport à leurs centres\n\n"
+            "• La fusée doit être à une distance de 20 cm du fond\n\n"
+            "• La caméra doit être à une distance de 1,20 m du fond\n\n"
+            "• La fusée doit être centrée et bien verticale sur l'image\n\n"
             "• Faire en sorte qu'il y ait au moins un aileron dont la surface est parallèle avec le fond",
             font_size=self.sp(27),
             color=(0, 0, 0, 1),
