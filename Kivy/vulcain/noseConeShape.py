@@ -94,8 +94,8 @@ def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.60):
         type_arc = 2
     else:
         # Analyse de la courbure à la pointe pour distinguer Parabolique d'Ogivale
-        num_points_gauche_pointe = 22
-        num_points_droite_pointe = 22
+        num_points_gauche_pointe = 15
+        num_points_droite_pointe = 15
 
         # Extraction des points situés juste autour du sommet
         x_gauche_pointe = x_gauche[idx_pointe-num_points_gauche_pointe+1:idx_pointe-4]
