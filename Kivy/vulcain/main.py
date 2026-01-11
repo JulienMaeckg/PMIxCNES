@@ -171,6 +171,16 @@ class RoundedButton(Button):
         """Restaure la couleur de fond initiale lorsque le bouton est relâché."""
         self.bg_color.rgba = self._bg_color
 
+    def on_disabled(self, instance, value):
+        """Change l'apparence quand l'état disabled change."""
+        if hasattr(self, 'bg_color'):
+            if value:  # Si désactivé (True)
+                # On le met en gris foncé
+                self.bg_color.rgba = (0.6, 0.6, 0.6, 1) 
+            else:      # Si activé (False)
+                # On remet la couleur d'origine
+                self.bg_color.rgba = self._bg_color
+
 
 class RoundedSpinner(Spinner):
     """Classe personnalisée pour un menu déroulant aux coins arrondis."""
@@ -228,7 +238,7 @@ class RoundedSpinner(Spinner):
                     btn = Button(
                         text=value,
                         size_hint_y=None,
-                        height=sp(35),
+                        height=sp(40),
                         background_normal="",
                         background_down="",
                         background_color=(0.95, 0.95, 0.95, 1),
@@ -265,6 +275,39 @@ class RoundedSpinner(Spinner):
 
 class VulcainApp(App):
     """Classe principale de l'application Vulcain."""
+
+    def update_buttons_state(self):
+        """Met à jour l'état (gris/cliquable) de tous les boutons selon le workflow."""
+        
+        # 1. Bouton "Scanner fusée"
+        # Il est grisé si la fusée est déjà scannée
+        if self.fusee_scannee == 1:
+            self.bouton_scan.disabled = True
+        else:
+            self.bouton_scan.disabled = False
+
+        # 2. Bouton "Extraire dimensions"
+        # Dégrisé SI scannée (1) ET PAS ENCORE calculée (0)
+        # Grisé si pas scannée OU si déjà calculée
+        if self.fusee_scannee == 1 and self.fusee_dimensions == 0:
+            self.bouton_calcul.disabled = False
+        else:
+            self.bouton_calcul.disabled = True
+
+        # 3. Bouton "Afficher les résultats"
+        # Dégrisé seulement si les dimensions sont extraites
+        if self.fusee_dimensions == 1:
+            self.bouton_details.disabled = False
+        else:
+            self.bouton_details.disabled = True
+
+        # 4. Bouton "Envoyer les données"
+        # Dégrisé si on a affiché les détails ET qu'on n'a pas encore envoyé
+        # Note: J'utilise une variable self.donnees_envoyees qu'il faudra initialiser
+        if self.afficher_det == 1 and not self.donnees_envoyees and self.SPOCK_id != "" and self.SPOCK_key != "":
+            self.bouton_send_api.disabled = False
+        else:
+            self.bouton_send_api.disabled = True
 
     def build(self):
         # Gestion des permissions au lancement sur Android
@@ -323,6 +366,7 @@ class VulcainApp(App):
         self.fusee_scannee = 0
         self.fusee_dimensions = 0
         self.afficher_det = 0
+        self.donnees_envoyees = False
         # Dictionnaire global contenant les mesures extraites de la fusée
         self.donnees_completes = {}
         self.donnees_completes["Q_ail"] = None
@@ -354,7 +398,7 @@ class VulcainApp(App):
         self.ailerons_label = Label(
             text="Ailerons", font_size=self.sp(35), size_hint_y=0.1, color=(0, 0, 0, 1)
         )
-        # layout.add_widget(self.ailerons_label)
+        layout.add_widget(self.ailerons_label)
 
         # Ligne de configuration du nombre d'ailerons inférieurs
         aileron_bas_layout = BoxLayout(orientation="horizontal", size_hint_y=0.1)
@@ -394,7 +438,7 @@ class VulcainApp(App):
         # Menu déroulant pour le choix de l'épaisseur (1 à 20 mm)
         self.aileron_bas_epaisseur_spinner = RoundedSpinner(
             text="3",
-            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"),
+            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"),
             size_hint_x=0.4,
             font_size=self.sp(25),
             background_color=(0.8, 0.8, 0.8, 1),
@@ -442,7 +486,7 @@ class VulcainApp(App):
         # Menu déroulant pour le choix de l'épaisseur (1 à 20 mm)
         self.aileron_haut_epaisseur_spinner = RoundedSpinner(
             text="3",
-            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"),
+            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"),
             size_hint_x=0.4,
             font_size=self.sp(25),
             background_color=(0.8, 0.8, 0.8, 1),
@@ -459,7 +503,7 @@ class VulcainApp(App):
         self.scannage_label = Label(
             text="Scannage", font_size=self.sp(35), size_hint_y=0.1, color=(0, 0, 0, 1)
         )
-        layout.add_widget(self.scannage_label)
+        # layout.add_widget(self.scannage_label)
 
         # Boutons d'action pour le scan et le calcul
         scannage_buttons_layout = BoxLayout(
@@ -493,60 +537,63 @@ class VulcainApp(App):
         )
         layout.add_widget(self.infos_label)
 
-        # Zone des boutons de gestion des résultats et remise à zéro
-        texte_buttons_layout = BoxLayout(
-            orientation="vertical", size_hint_y=0.2, spacing=self.pad(10)
+        # Zone des boutons utilitaires en bas d'écran
+        bottom_buttons_layout = BoxLayout(
+            orientation="vertical", size_hint_y=0.5, spacing=self.pad(10)
         )
         self.bouton_details = RoundedButton(
             text="Afficher les résultats",
             background_color=(0.8, 0.8, 0.8, 1),
             font_size=self.sp(25),
             color=(0, 0, 0, 1),
-            size_hint_y=0.5,
         )
-        # TODO: Ajouter la fonction self.afficher_details au bind du bouton_details
-        self.bouton_reset = RoundedButton(
-            text="Réinitialiser",
-            background_color=(0.8, 0.8, 0.8, 1),
-            color=(0, 0, 0, 1),
-            font_size=self.sp(25),
-            size_hint_y=0.5,
-        )
-        self.bouton_reset.bind(on_release=self.reset_donnees)
-        self.bouton_details.bind(on_release=self.afficher_details)
-        texte_buttons_layout.add_widget(self.bouton_details)
-        texte_buttons_layout.add_widget(self.bouton_reset)
-        layout.add_widget(texte_buttons_layout)
 
-        # Zone des boutons utilitaires en bas d'écran
-        bottom_buttons_layout = BoxLayout(
-            orientation="vertical", size_hint_y=0.3, spacing=self.pad(10)
-        )
         self.bouton_identifiants = RoundedButton(
             text="Identification SPOCK",
             background_color=(0.8, 0.8, 0.8, 1),
             font_size=self.sp(25),
             color=(0, 0, 0, 1),
         )
-        self.bouton_identifiants.bind(on_release=self.afficher_identifiants_SPOCK)
+        
         self.bouton_send_api = RoundedButton(
             text="Envoyer les données",
             background_color=(0.8, 0.8, 0.8, 1),
             font_size=self.sp(25),
             color=(0, 0, 0, 1),
         )
+
+        self.bouton_reset = RoundedButton(
+            text="Réinitialiser",
+            background_color=(0.8, 0.8, 0.8, 1),
+            color=(0, 0, 0, 1),
+            font_size=self.sp(25),
+        )
+
         self.bouton_guide = RoundedButton(
             text="Guide d'utilisation",
             background_color=(0.8, 0.8, 0.8, 1),
             font_size=self.sp(25),
             color=(0, 0, 0, 1),
         )
-        self.bouton_guide.bind(on_release=self.afficher_guide)
+
+        self.bouton_details.bind(on_release=self.afficher_details)
+        bottom_buttons_layout.add_widget(self.bouton_details)
+
+        self.bouton_identifiants.bind(on_release=self.afficher_identifiants_SPOCK)
         bottom_buttons_layout.add_widget(self.bouton_identifiants)
-        bottom_buttons_layout.add_widget(self.bouton_send_api)
+
         self.bouton_send_api.bind(on_release=self.send_api)
+        bottom_buttons_layout.add_widget(self.bouton_send_api)
+
+        self.bouton_reset.bind(on_release=self.reset_donnees)
+        bottom_buttons_layout.add_widget(self.bouton_reset)
+
+        self.bouton_guide.bind(on_release=self.afficher_guide)
         bottom_buttons_layout.add_widget(self.bouton_guide)
+
         layout.add_widget(bottom_buttons_layout)
+
+        self.update_buttons_state()
 
         # Retourne le layout complet pour l'affichage
         return layout
@@ -754,6 +801,10 @@ class VulcainApp(App):
             ),
             delai,
         )
+        Clock.schedule_once(
+            lambda dt: self.update_buttons_state(),
+            delai,
+        )
 
     def update_scale_factor(self):
         """Calcule le ratio entre la largeur réelle de l'écran et la largeur de référence."""
@@ -837,6 +888,8 @@ class VulcainApp(App):
         self.fusee_scannee = 0
         self.fusee_dimensions = 0
         self.afficher_det = 0
+        self.donnees_envoyees = False
+        self.update_buttons_state()
         # Effacement des identifiants
         self.SPOCK_key = ""
         self.SPOCK_id = ""
@@ -864,6 +917,9 @@ class VulcainApp(App):
         if self.afficher_det == 1 and self.fusee_dimensions == 1:
             # Désactivation du flag d'affichage pour obliger à revoir les détails
             self.afficher_det = 0
+
+            self.donnees_envoyees = False # On permet de renvoyer si on a changé les ailerons
+            self.update_buttons_state()
 
             # Repassage au statut "Données extraites" (vert)
             couleur = "00ff00"
@@ -1135,6 +1191,8 @@ class VulcainApp(App):
             self.fusee_scannee = 1
             print("[IMAGE] Image validée et chemin stocké.")
 
+            self.update_buttons_state()
+
         except Exception as e:
             # Erreur si le fichier n'est pas une image valide
             print(f"[IMAGE] ERREUR de validation: {e}")
@@ -1295,7 +1353,7 @@ class VulcainApp(App):
                 self.texte_base = texte
                 self.couleur = couleur
                 self.infos_label.text = f"[b][color={couleur}]{texte}[/color][/b]"
-
+                self.update_buttons_state()
             # Planification de la mise à jour UI
             Clock.schedule_once(update_ui_success, 0)
 
@@ -1546,7 +1604,7 @@ class VulcainApp(App):
         if q_ail > 0:
             ail_bas_data = [
                 ("  Nombre d'ailerons", q_ail, ""),
-                #("  Épaisseur", self.donnees_completes.get("ep_ail", "N/A"), "mm"),
+                ("  Épaisseur", self.donnees_completes.get("ep_ail", "N/A"), "mm"),
                 ("  Emplanture (m)", self.donnees_completes.get("m_ail", "N/A"), "mm"),
                 ("  Saumon (n)", self.donnees_completes.get("n_ail", "N/A"), "mm"),
                 ("  Flèche (p)", self.donnees_completes.get("p_ail", "N/A"), "mm"),
@@ -1595,7 +1653,7 @@ class VulcainApp(App):
         )
         content.do_layout()
         # Ajustement de la hauteur du popup selon le contenu sans dépasser l'écran
-        popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.95)
+        popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.9)
 
         # Mise à jour du statut global pour l'envoi
         couleur = "00ff00"
@@ -1605,6 +1663,9 @@ class VulcainApp(App):
         self.infos_label.text = f"[b][color={couleur}]{texte}[/color][/b]"
 
         btn_fermer.bind(on_release=popup.dismiss)
+
+        self.update_buttons_state()
+
         popup.open()
 
     def send_api(self, instance):
@@ -1626,6 +1687,8 @@ class VulcainApp(App):
                         if sended_to_SPOCK:
                             couleur = "00ff00"
                             texte = "DONNÉES ENVOYÉES !"
+                            self.donnees_envoyees = True
+                            self.update_buttons_state()
                         else:
                             couleur = "ff0000"
                             texte = "PROBLÈME LORS DE L'ENVOI..."
@@ -1976,6 +2039,7 @@ class VulcainApp(App):
                 )
                 # AJOUTER CETTE LIGNE ICI :
                 self.update_spock_button_color()
+                self.update_buttons_state()
 
             Clock.schedule_once(executer_sauvegarde, 0.6)
 
