@@ -228,7 +228,7 @@ class RoundedSpinner(Spinner):
                     btn = Button(
                         text=value,
                         size_hint_y=None,
-                        height=sp(60),
+                        height=sp(35),
                         background_normal="",
                         background_down="",
                         background_color=(0.95, 0.95, 0.95, 1),
@@ -257,7 +257,7 @@ class RoundedSpinner(Spinner):
                     dropdown.add_widget(btn)
 
         # Planification de la personnalisation après l'initialisation du widget
-        Clock.schedule_once(customize_dropdown, 0.1)
+        Clock.schedule_once(customize_dropdown, 0.001)
 
         # Ré-application du style si la liste des valeurs est modifiée dynamiquement
         self.bind(values=customize_dropdown)
@@ -326,7 +326,9 @@ class VulcainApp(App):
         # Dictionnaire global contenant les mesures extraites de la fusée
         self.donnees_completes = {}
         self.donnees_completes["Q_ail"] = None
+        self.donnees_completes["ep_ail"] = None
         self.donnees_completes["Q_can"] = None
+        self.donnees_completes["ep_can"] = None
 
         # Liaison des événements Android (résultats d'activités et nouveaux liens)
         if platform == "android":
@@ -357,7 +359,7 @@ class VulcainApp(App):
         # Ligne de configuration du nombre d'ailerons inférieurs
         aileron_bas_layout = BoxLayout(orientation="horizontal", size_hint_y=0.1)
         self.aileron_bas_label = Label(
-            text="Nombre d'ailerons :",
+            text="Nombre :",
             font_size=self.sp(25),
             color=(0, 0, 0, 1),
             size_hint_x=0.6,
@@ -378,6 +380,33 @@ class VulcainApp(App):
         self.aileron_bas_spinner.bind(text=self.on_aileron_change)
         aileron_bas_layout.add_widget(self.aileron_bas_spinner)
         layout.add_widget(aileron_bas_layout)
+
+
+        # Ligne de configuration épaisseur ailerons inférieurs
+        aileron_bas_epaisseur_layout = BoxLayout(orientation="horizontal", size_hint_y=0.1)
+        self.aileron_bas_epaisseur_label = Label(
+            text="Épaisseur (mm) :",
+            font_size=self.sp(25),
+            color=(0, 0, 0, 1),
+            size_hint_x=0.6,
+        )
+        aileron_bas_epaisseur_layout.add_widget(self.aileron_bas_epaisseur_label)
+        # Menu déroulant pour le choix de l'épaisseur (1 à 20 mm)
+        self.aileron_bas_epaisseur_spinner = RoundedSpinner(
+            text="3",
+            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"),
+            size_hint_x=0.4,
+            font_size=self.sp(25),
+            background_color=(0.8, 0.8, 0.8, 1),
+            color=(0, 0, 0, 1),
+        )
+        # Liaison pour la mise à jour de la police à l'ouverture du menu
+        self.aileron_bas_epaisseur_spinner.bind(on_release=self._on_spinner_open)
+        # Liaison pour réinitialiser l'état si l'utilisateur change de configuration
+        self.aileron_bas_epaisseur_spinner.bind(text=self.on_aileron_change)
+        aileron_bas_epaisseur_layout.add_widget(self.aileron_bas_epaisseur_spinner)
+        layout.add_widget(aileron_bas_epaisseur_layout)
+
 
         # Section pour les ailerons supérieurs (canards) - Configuration similaire
         aileron_haut_layout = BoxLayout(orientation="horizontal", size_hint_y=0.1)
@@ -400,6 +429,31 @@ class VulcainApp(App):
         self.aileron_haut_spinner.bind(text=self.on_aileron_change)
         aileron_haut_layout.add_widget(self.aileron_haut_spinner)
         # layout.add_widget(aileron_haut_layout)
+
+        # Ligne de configuration épaisseur ailerons supérieurs
+        aileron_haut_epaisseur_layout = BoxLayout(orientation="horizontal", size_hint_y=0.1)
+        self.aileron_haut_epaisseur_label = Label(
+            text="Épaisseur (mm) :",
+            font_size=self.sp(25),
+            color=(0, 0, 0, 1),
+            size_hint_x=0.6,
+        )
+        aileron_haut_epaisseur_layout.add_widget(self.aileron_haut_epaisseur_label)
+        # Menu déroulant pour le choix de l'épaisseur (1 à 20 mm)
+        self.aileron_haut_epaisseur_spinner = RoundedSpinner(
+            text="3",
+            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"),
+            size_hint_x=0.4,
+            font_size=self.sp(25),
+            background_color=(0.8, 0.8, 0.8, 1),
+            color=(0, 0, 0, 1),
+        )
+        # Liaison pour la mise à jour de la police à l'ouverture du menu
+        self.aileron_haut_epaisseur_spinner.bind(on_release=self._on_spinner_open)
+        # Liaison pour réinitialiser l'état si l'utilisateur change de configuration
+        self.aileron_haut_epaisseur_spinner.bind(text=self.on_aileron_change)
+        aileron_haut_epaisseur_layout.add_widget(self.aileron_haut_epaisseur_spinner)
+        # layout.add_widget(aileron_haut_epaisseur_layout)
 
         # Étiquette de section pour le scannage
         self.scannage_label = Label(
@@ -726,8 +780,12 @@ class VulcainApp(App):
             (self.ailerons_label, 35),
             (self.aileron_bas_label, 25),
             (self.aileron_bas_spinner, 25),
+            (self.aileron_bas_epaisseur_label, 25),
+            (self.aileron_bas_epaisseur_spinner, 25),
             (self.aileron_haut_label, 25),
             (self.aileron_haut_spinner, 25),
+            (self.aileron_haut_epaisseur_label, 25),
+            (self.aileron_haut_epaisseur_spinner, 25),
             (self.scannage_label, 35),
             (self.bouton_scan, 25),
             (self.bouton_calcul, 25),
@@ -744,7 +802,7 @@ class VulcainApp(App):
 
     def _on_spinner_open(self, spinner):
         """Déclenche la mise à jour des polices des options dès l'ouverture du menu déroulant."""
-        Clock.schedule_once(lambda dt: self._update_spinner_font(spinner), 0.025)
+        Clock.schedule_once(lambda dt: self._update_spinner_font(spinner), 0.001)
 
     def _update_spinner_font(self, spinner):
         """Parcourt les éléments du menu déroulant pour ajuster leur taille de texte."""
@@ -760,10 +818,14 @@ class VulcainApp(App):
         # Remise à zéro des mesures
         self.donnees_completes = {}
         self.donnees_completes["Q_ail"] = None
+        self.donnees_completes["ep_ail"] = None
         self.donnees_completes["Q_can"] = None
+        self.donnees_completes["ep_can"] = None
         # Remise à zéro des menus de sélection
         self.aileron_bas_spinner.text = "4"
+        self.aileron_bas_epaisseur_spinner.text = "3"
         self.aileron_haut_spinner.text = "0"
+        self.aileron_haut_epaisseur_spinner.text = "3"
         # Reset des couleurs et textes de base
         couleur = "000000"
         texte = "EN ATTENTE"
@@ -1221,7 +1283,9 @@ class VulcainApp(App):
             
             # Récupération des valeurs saisies dans l'UI
             self.donnees_completes["Q_ail"] = int(self.aileron_bas_spinner.text)
-            self.donnees_completes["Q_can"] = 0
+            self.donnees_completes["ep_ail"] = int(self.aileron_bas_epaisseur_spinner.text)
+            self.donnees_completes["Q_can"] = 0 # int(self.aileron_haut_spinner.text)
+            self.donnees_completes["ep_can"] = 0 # int(self.aileron_haut_epaisseur_spinner.text)
 
             # Fonction interne pour notifier le succès sur le thread principal
             def update_ui_success(dt):
@@ -1283,7 +1347,9 @@ class VulcainApp(App):
 
         # Rafraîchissement des quantités d'ailerons
         self.donnees_completes["Q_ail"] = int(self.aileron_bas_spinner.text)
-        self.donnees_completes["Q_can"] = 0
+        self.donnees_completes["ep_ail"] = int(self.aileron_bas_epaisseur_spinner.text)
+        self.donnees_completes["Q_can"] = 0 # int(self.aileron_haut_spinner.text)
+        self.donnees_completes["ep_can"] = 0 # int(self.aileron_haut_epaisseur_spinner.text)
         # Création du conteneur en grille simple colonne
         content = GridLayout(cols=1, spacing=self.pad(10), padding=self.pad(10))
         self.afficher_det = 1
@@ -1291,10 +1357,10 @@ class VulcainApp(App):
         # --- Section Ogive ---
         section_ogive = Label(
             text="[b][u]OGIVE[/u][/b]",
-            font_size=self.sp(34),
+            font_size=self.sp(32),
             color=(0, 0, 0, 1),
             size_hint_y=None,
-            height=self.sp(50),
+            height=self.sp(44),
             markup=True,
         )
         content.add_widget(section_ogive)
@@ -1316,7 +1382,7 @@ class VulcainApp(App):
         for label_text, value, unit in ogive_data:
             data_label = Label(
                 text=f"{label_text} : [b]{value} {unit}[/b]",
-                font_size=self.sp(27),
+                font_size=self.sp(25),
                 color=(0, 0, 0, 1),
                 size_hint_y=None,
                 height=self.sp(35),
@@ -1328,16 +1394,16 @@ class VulcainApp(App):
             content.add_widget(data_label)
 
         # Espacement visuel
-        separateur1 = Label(text="", size_hint_y=None, height=self.sp(10))
+        separateur1 = Label(text="", size_hint_y=None, height=self.sp(2))
         content.add_widget(separateur1)
 
         # --- Section Corps et Transitions ---
         section_transitions = Label(
             text="[b][u]CORPS[/u][/b]",
-            font_size=self.sp(34),
+            font_size=self.sp(32),
             color=(0, 0, 0, 1),
             size_hint_y=None,
-            height=self.sp(50),
+            height=self.sp(44),
             markup=True,
         )
         content.add_widget(section_transitions)
@@ -1350,7 +1416,7 @@ class VulcainApp(App):
         for label_text, value, unit in general_data:
             data_label = Label(
                 text=f"{label_text} : [b]{value} {unit}[/b]",
-                font_size=self.sp(27),
+                font_size=self.sp(25),
                 color=(0, 0, 0, 1),
                 size_hint_y=None,
                 height=self.sp(35),
@@ -1366,7 +1432,7 @@ class VulcainApp(App):
         if nb_trans >= 1:
             trans1_label = Label(
                 text="[b]Transition 1 :[/b]",
-                font_size=self.sp(29),
+                font_size=self.sp(27),
                 color=(0.2, 0.2, 0.8, 1),
                 size_hint_y=None,
                 height=self.sp(40),
@@ -1384,7 +1450,7 @@ class VulcainApp(App):
             for label_text, value, unit in trans1_data:
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
-                    font_size=self.sp(27),
+                    font_size=self.sp(25),
                     color=(0, 0, 0, 1),
                     size_hint_y=None,
                     height=self.sp(32),
@@ -1399,7 +1465,7 @@ class VulcainApp(App):
         if nb_trans >= 2:
             trans2_label = Label(
                 text="[b]Transition 2 :[/b]",
-                font_size=self.sp(29),
+                font_size=self.sp(27),
                 color=(0.2, 0.2, 0.8, 1),
                 size_hint_y=None,
                 height=self.sp(40),
@@ -1417,7 +1483,7 @@ class VulcainApp(App):
             for label_text, value, unit in trans2_data:
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
-                    font_size=self.sp(27),
+                    font_size=self.sp(25),
                     color=(0, 0, 0, 1),
                     size_hint_y=None,
                     height=self.sp(32),
@@ -1431,7 +1497,7 @@ class VulcainApp(App):
         if nb_trans >= 3:
             trans3_label = Label(
                 text="[b]Transition 3 :[/b]",
-                font_size=self.sp(29),
+                font_size=self.sp(27),
                 color=(0.2, 0.2, 0.8, 1),
                 size_hint_y=None,
                 height=self.sp(40),
@@ -1449,7 +1515,7 @@ class VulcainApp(App):
             for label_text, value, unit in trans3_data:
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
-                    font_size=self.sp(27),
+                    font_size=self.sp(25),
                     color=(0, 0, 0, 1),
                     size_hint_y=None,
                     height=self.sp(32),
@@ -1460,16 +1526,16 @@ class VulcainApp(App):
                 data_label.bind(size=data_label.setter("text_size"))
                 content.add_widget(data_label)
 
-        separateur2 = Label(text="", size_hint_y=None, height=self.sp(10))
+        separateur2 = Label(text="", size_hint_y=None, height=self.sp(2))
         content.add_widget(separateur2)
 
         # --- Section Ailerons ---
         section_ailerons = Label(
             text="[b][u]AILERONS[/u][/b]",
-            font_size=self.sp(34),
+            font_size=self.sp(32),
             color=(0, 0, 0, 1),
             size_hint_y=None,
-            height=self.sp(50),
+            height=self.sp(44),
             markup=True,
         )
         content.add_widget(section_ailerons)
@@ -1480,6 +1546,7 @@ class VulcainApp(App):
         if q_ail > 0:
             ail_bas_data = [
                 ("  Nombre d'ailerons", q_ail, ""),
+                #("  Épaisseur", self.donnees_completes.get("ep_ail", "N/A"), "mm"),
                 ("  Emplanture (m)", self.donnees_completes.get("m_ail", "N/A"), "mm"),
                 ("  Saumon (n)", self.donnees_completes.get("n_ail", "N/A"), "mm"),
                 ("  Flèche (p)", self.donnees_completes.get("p_ail", "N/A"), "mm"),
@@ -1489,7 +1556,7 @@ class VulcainApp(App):
             for label_text, value, unit in ail_bas_data:
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
-                    font_size=self.sp(27),
+                    font_size=self.sp(25),
                     color=(0, 0, 0, 1),
                     size_hint_y=None,
                     height=self.sp(32),
@@ -1502,9 +1569,6 @@ class VulcainApp(App):
 
         # (Note: La partie ailerons haut/canard est présente dans le code mais non ajoutée au widget)
         q_can = int(self.aileron_haut_spinner.text)
-
-        separateur3 = Label(text="", size_hint_y=None, height=self.sp(10))
-        content.add_widget(separateur3)
 
         # Ajout d'un espace vide pour pousser le bouton vers le bas
         spacer = Label(text="", size_hint_y=1)
@@ -1531,7 +1595,7 @@ class VulcainApp(App):
         )
         content.do_layout()
         # Ajustement de la hauteur du popup selon le contenu sans dépasser l'écran
-        popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.9)
+        popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.95)
 
         # Mise à jour du statut global pour l'envoi
         couleur = "00ff00"
@@ -1546,7 +1610,7 @@ class VulcainApp(App):
     def send_api(self, instance):
         """Valide les conditions et transmet les données à l'API SPOCK."""
         # Vérification si le nombre d'ailerons a été modifié après extraction
-        if self.donnees_completes["Q_ail"] != int(self.aileron_bas_spinner.text):
+        if self.donnees_completes["Q_ail"] != int(self.aileron_bas_spinner.text) or self.donnees_completes["ep_ail"] != int(self.aileron_bas_epaisseur_spinner.text): # or self.donnees_completes["Q_can"] != int(self.aileron_haut_spinner.text) or self.donnees_completes["ep_can"] != int(self.aileron_haut_epaisseur_spinner.text)
             self.afficher_det = 0
 
         # Arbre de décision pour valider l'état de l'application avant envoi
