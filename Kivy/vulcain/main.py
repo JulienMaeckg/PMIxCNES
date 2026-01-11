@@ -169,7 +169,8 @@ class RoundedButton(Button):
 
     def _on_release(self, *args):
         """Restaure la couleur de fond initiale lorsque le bouton est relâché."""
-        self.bg_color.rgba = self._bg_color
+        if not self.disabled:
+            self.bg_color.rgba = self._bg_color
 
     def on_disabled(self, instance, value):
         """Change l'apparence quand l'état disabled change."""
@@ -1191,7 +1192,7 @@ class VulcainApp(App):
             self.fusee_scannee = 1
             print("[IMAGE] Image validée et chemin stocké.")
 
-            self.update_buttons_state()
+            Clock.schedule_once(lambda dt: self.update_buttons_state(), 0)
 
         except Exception as e:
             # Erreur si le fichier n'est pas une image valide
