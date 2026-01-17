@@ -52,7 +52,7 @@ def calculer_regression_R2(contour_x, contour_y):
     return R2, a
 
 
-def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.60):
+def classifier_arc(matrice, seuil_R2_conique=0.9555, seuil_pointe=0.7256):
     """Classifie la pointe de la fusée en 0 (Parabolique), 1 (Ogivale) ou 2 (Conique)."""
     # Extraction du contour depuis la matrice binaire
     contour_x, contour_y = detecter_contour(matrice)
@@ -91,18 +91,25 @@ def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.60):
 
     # Si très rectiligne, c'est un cône parfait (Type 2)
     if R2_moyenne > seuil_R2_conique:
-        type_arc = 2
+        return 2
     else:
+        nbp = 20
+        d = 12
+
         # Analyse de la courbure à la pointe pour distinguer Parabolique d'Ogivale
-        num_points_gauche_pointe = 15
-        num_points_droite_pointe = 15
+        num_points_gauche_pointe = nbp
+        num_points_droite_pointe = nbp
 
         # Extraction des points situés juste autour du sommet
-        x_gauche_pointe = x_gauche[idx_pointe-num_points_gauche_pointe+1:idx_pointe-4]
-        y_gauche_pointe = y_gauche[idx_pointe-num_points_gauche_pointe+1:idx_pointe-4]
-        
-        x_droite_pointe = x_droite[5:num_points_droite_pointe]
-        y_droite_pointe = y_droite[5:num_points_droite_pointe]
+        x_gauche_pointe = x_gauche[
+            idx_pointe - num_points_gauche_pointe + 1 : idx_pointe - (d - 1)
+        ]
+        y_gauche_pointe = y_gauche[
+            idx_pointe - num_points_gauche_pointe + 1 : idx_pointe - (d - 1)
+        ]
+
+        x_droite_pointe = x_droite[d:num_points_droite_pointe]
+        y_droite_pointe = y_droite[d:num_points_droite_pointe]
 
         # Calcul de la pente locale des deux côtés de la pointe
         _, a = calculer_regression_R2(x_gauche_pointe, y_gauche_pointe)
@@ -113,11 +120,9 @@ def classifier_arc(matrice, seuil_R2_conique=0.95, seuil_pointe=0.60):
 
         # Si la pointe est "aiguë" (pente forte), c'est une ogive (Type 1)
         if coeff_moy > seuil_pointe:
-            type_arc = 1
-        # Sinon, la pointe est arrondie (Type 0)
-        else:
-            type_arc = 0
-    return type_arc
+            return 1
+    # Sinon, la pointe est arrondie (Type 0)
+    return 0
 
 
 def noseConeType(cone):
