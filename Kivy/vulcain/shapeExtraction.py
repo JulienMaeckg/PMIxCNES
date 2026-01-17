@@ -61,7 +61,7 @@ def resize_image(img, max_size=2000):
 def dimensions(img):
     """Envoie l'image au serveur FastAPI et extrait les dimensions calculées."""
     # Adresse IP du serveur distant réalisant le traitement IA
-    url = "http://51.178.50.148:8000/predict"
+    url = "http://xxx.xxx.xxx.xxx:8000/predict"
 
     try:
         # Préparation de l'image (Chargement et Redimensionnement)
