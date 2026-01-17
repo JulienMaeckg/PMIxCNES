@@ -116,7 +116,7 @@ def classifier_arc(matrice, seuil_R2_conique=0.9555, seuil_pointe=0.7256):
         _, b = calculer_regression_R2(x_droite_pointe, y_droite_pointe)
 
         # Calcul du coefficient angulaire moyen
-        coeff_moy = (a - b) / 2
+        coeff_moy = min(abs(a), abs(b))
 
         # Si la pointe est "aiguë" (pente forte), c'est une ogive (Type 1)
         if coeff_moy > seuil_pointe:
