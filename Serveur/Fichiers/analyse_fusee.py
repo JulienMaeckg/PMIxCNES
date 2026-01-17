@@ -1,10 +1,8 @@
-from scipy.ndimage import label, center_of_mass, binary_fill_holes
+from scipy.ndimage import label, center_of_mass
 import segmentation_models_pytorch as smp
 import numpy as np
 import torch
 import cv2
-
-#%%
 
 # ------------------------------------------------------------
 # DFS pour les composantes connexes
@@ -61,6 +59,9 @@ def facteur_correction(Z_mires, d_fusee):
     return Z_mires / (Z_mires - d_fusee)
 
 
+
+
+
 def load_image2(image, target_size=(512,512), device="cpu"):
     """
     Charge une image PIL, redimensionne pour le réseau, normalise et retourne le tenseur.
@@ -104,138 +105,7 @@ def load_image2(image, target_size=(512,512), device="cpu"):
 # en pixels.
 # ------------------------------------------------------------
 def analyse_image(path_image):
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # Chargement du modèle de détection des mires
-    # ─────────────────────────────────────────────────────────────────────────────
-
-    # Ici on va venir charger le réseau de neuronnes préentraine pour la détection des mires
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = smp.Unet(
-        encoder_name="resnet34",
-        encoder_weights=None,
-        in_channels=3,
-        classes=4
-    )
-
-    model.load_state_dict(torch.load("modele_mires.pth", map_location=device))# On charge les poids du modèle entraîné
-    #checkpoint = torch.load("modele_mires.pth", map_location=device)
-    #model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
     
-    # ─────────────────────────────────────────────────────────────────────────────
-    # Prédiction du masque des mires
-    # ─────────────────────────────────────────────────────────────────────────────
-
-    img_tensor, img_np, original_size = load_image(path_image, device=device)# Charge et redimensionne l'image pour le réseau et on garde les dimensions originales
-
-    with torch.no_grad():
-        pred = model(img_tensor)
-        pred_mask = torch.argmax(pred, dim=1).squeeze(0).cpu().numpy()
-    
-    # On redimensionne le masque aux dimensions originales de l'image
-    pred_mask_original = cv2.resize(pred_mask, original_size, interpolation=cv2.INTER_NEAREST)
-    
-    # ─────────────────────────────────────────────────────────────────────────────
-    # Extraction et nettoyage des mires détectées
-    # ─────────────────────────────────────────────────────────────────────────────
-    mask_mires_brut = (pred_mask_original == 1).astype(int)
-    labeled_array, num_features = label(mask_mires_brut)
-    #print(f"Nombre de groupes détectés : {num_features}")
-    
-    # ═════════════════════════════════════════════════════════════════════════════
-    # AU MOINS 4 MIRES DÉTECTÉES
-    # ═════════════════════════════════════════════════════════════════════════════
-
-    if num_features >= 4:
-            
-        # ─────────────────────────────────────────────────────────────────────────
-        # Sélection des 4 plus gros groupes (les vraies mires)
-        # ─────────────────────────────────────────────────────────────────────────
-
-        # Pour chaque groupe, on calcule sa distance minimale aux bords gauche et droit
-        edge_distances = []
-        width = labeled_array.shape[1]  # Largeur de l'image
-
-        for i in range(1, num_features + 1):
-            # Trouve les coordonnées de tous les pixels du groupe i
-            coords = np.argwhere(labeled_array == i)
-            # coords[:, 1] contient les coordonnées x (colonnes)
-            x_coords = coords[:, 1]
-            
-            # Distance minimale au bord gauche (x=0) ou droit (x=width-1)
-            min_dist_left = np.min(x_coords)
-            min_dist_right = width - 1 - np.max(x_coords)
-            min_edge_distance = min(min_dist_left, min_dist_right)
-            
-            edge_distances.append(min_edge_distance)
-
-        # On trie les groupes par distance croissante aux bords (les plus proches en premier)
-        sorted_labels = [i + 1 for i in np.argsort(edge_distances)]
-        top_4_labels = sorted_labels[:4]  # On garde les 4 plus proches des bords
-
-        
-        # On crée maitenant un masque nettoyé avec seulement les 4 plus gros groupes
-        mask_mires_clean = np.zeros_like(mask_mires_brut)
-        for lbl in top_4_labels:
-            mask_mires_clean[labeled_array == lbl] = 1
-        
-        # On Re-labellise le masque nettoyé (labels 1, 2, 3, 4) pour reconnaitre précisément chaque mires
-        labeled_array_clean, _ = label(mask_mires_clean)
-
-        # Trouver les colonnes où il y a des pixels à 1
-        cols_with_mires = np.where(mask_mires_clean.any(axis=0))[0]
-
-        if len(cols_with_mires) > 0:
-            left_bound = cols_with_mires[0]
-            right_bound = cols_with_mires[-1]
-        else:
-            # Fallback si aucune mire n'est détectée
-            left_bound = 0
-            right_bound = mask_mires_clean.shape[1] - 1
-
-        mask_mires_clean = mask_mires_clean[:, left_bound:right_bound+1]
-
-        # ─────────────────────────────────────────────────────────────────────────
-        # Calcul des centres de masse des 4 mires
-        # ─────────────────────────────────────────────────────────────────────────
-
-        centers = []
-        for lbl in range(1, 5):  # Labels 1, 2, 3, 4
-            # On isole le groupe de pixels de cette mire
-            group_mask = (labeled_array_clean == lbl).astype(int)
-            # On calcule son centre de masse (coordonnées moyennes pondérées)
-            center = center_of_mass(group_mask)
-            centers.append(center)
-            #print(f"Centre mire {lbl}: ({center[0]:.1f}, {center[1]:.1f})")
-        
-        # ─────────────────────────────────────────────────────────────────────────
-        # Identification des 4 coins du rectangle de référence
-        # ─────────────────────────────────────────────────────────────────────────
-        
-        # On trie les centres par coordonnée Y (du haut vers le bas)
-        centers_sorted_y = sorted(centers, key=lambda c: c[0])
-        
-        # On sépare les 2 mires du haut et les 2 du bas
-        top_2 = sorted(centers_sorted_y[:2], key=lambda c: c[1])     # Trié par X
-        bottom_2 = sorted(centers_sorted_y[2:], key=lambda c: c[1])  # Trié par X
-        
-        # Assigne chaque coin
-        mire_haut_gauche = top_2[0]      # Coin supérieur gauche
-        mire_haut_droite = top_2[1]      # Coin supérieur droit
-        mire_bas_gauche = bottom_2[0]    # Coin inférieur gauche
-        mire_bas_droite = bottom_2[1]    # Coin inférieur droit
-        
-        # print("\n=== POSITION DES MIRES ===")
-        # print(f"Haut-Gauche  : ({mire_haut_gauche[0]:.1f}, {mire_haut_gauche[1]:.1f})")
-        # print(f"Haut-Droite  : ({mire_haut_droite[0]:.1f}, {mire_haut_droite[1]:.1f})")
-        # print(f"Bas-Gauche   : ({mire_bas_gauche[0]:.1f}, {mire_bas_gauche[1]:.1f})")
-        # print(f"Bas-Droite   : ({mire_bas_droite[0]:.1f}, {mire_bas_droite[1]:.1f})")
-
-    else:
-        raise ValueError(f"Calibration impossible : seulement {num_features} mire(s) détectée(s). Il en faut au moins 4.")
-
     # ════════════════════════════════════════════════════════════════════════════════
     # ███████╗██╗   ██╗███████╗███████╗███████╗
     # ██╔════╝██║   ██║██╔════╝██╔════╝██╔════╝
@@ -257,23 +127,27 @@ def analyse_image(path_image):
         in_channels=3,
         classes=4
     )
-    model.load_state_dict(torch.load("modele_fusee_V3.pth", map_location=device)) # on charge les poids
-    #checkpoint = torch.load("modele_fusee_V3.pth", map_location=device)
+    
+    # Charger le checkpoint complet
+    #checkpoint = torch.load("modele_fusee_final_V7.pth", map_location=device)
+    
+    # Extraire UNIQUEMENT les poids du modèle
     #model.load_state_dict(checkpoint['model_state_dict'])
+    
+    model.load_state_dict(torch.load("modele_fusee_final_V7.pth", map_location=device)) # on charge les poids
     model.to(device)
     model.eval()
 
-    path_image = path_image.crop((left_bound, 0, right_bound + 1, path_image.height))
     img_tensor, img_np, original_size = load_image2(path_image, device=device)  #Maintenant on va redimensionner l'image que l'on souhaite analyser pour le réseau
     #, mais surtout garder les dimensions de l'image d'origine
-
+    
     # # Prédiction
     # with torch.no_grad():
     #     pred = model(img_tensor)
     #     pred_mask = torch.argmax(pred.squeeze(), dim=0).cpu().numpy()# Ici on recupere le masque genere par le reseau, donc le fuselage cone et aielrons
-
+    
     # pred_mask_original = cv2.resize(pred_mask, original_size, interpolation=cv2.INTER_NEAREST) # On redimensionne ici le masque du reseau au vraies dimensions de l'iamge
-
+    
     pred = model(img_tensor)  # (1, C, H, W)
 
     # Resize des logits (float)
@@ -283,13 +157,14 @@ def analyse_image(path_image):
         mode="bilinear",
         align_corners=False
     )
-
+    
     # Argmax APRÈS resize
     pred_mask_original = torch.argmax(
         pred_resized.squeeze(0),
         dim=0
     ).cpu().numpy()
 
+    
     cleaned = np.zeros_like(pred_mask_original) # ici on prend une image vide
     comps = {1:[],2:[],3:[]}# Dictionnaire pour stocker les groupes de pixels par classe (1=fuselage, 2=coiffe, 3=ailerons)
     
@@ -346,15 +221,36 @@ def analyse_image(path_image):
         # ═══════════════════════════════════════════════════════════════════════════
         # DIAMETRE FUSELAGE
         # ═══════════════════════════════════════════════════════════════════════════
+        temp = np.zeros_like(cleaned)
+        for y, x in red:
+            temp[y, x] = 1
         
-        temp = np.zeros_like(cleaned) # Ici on va venir calculer la moyenne de la largeur du fuselage à chaque ligne
-        for y,x in red: temp[y,x]=1
+        # bornes verticales du fuselage
+        y_min = min(ys)
+        y_max = max(ys)
+        hauteur_rouge = y_max - y_min
+        
+        # zone utile (30% → 80%)
+        y_start = int(y_min + 0.3 * hauteur_rouge)
+        y_end   = int(y_min + 0.8 * hauteur_rouge)
+        
         epaisseurs = []
-        for y in range(temp.shape[0]):
-            xs_l = np.where(temp[y]==1)[0]
-            if len(xs_l)>1:
-                epaisseurs.append(xs_l.max()-xs_l.min())
+        
+        for y in range(y_start, y_end):
+            xs_l = np.where(temp[y] == 1)[0]
+            if len(xs_l) > 1:
+                epaisseurs.append(xs_l.max() - xs_l.min())
+
         epaisseur_moyenne_rouge = np.mean(epaisseurs) if epaisseurs else 0
+        
+        # temp = np.zeros_like(cleaned) # Ici on va venir calculer la moyenne de la largeur du fuselage à chaque ligne
+        # for y,x in red: temp[y,x]=1
+        # epaisseurs = []
+        # for y in range(temp.shape[0]):
+        #     xs_l = np.where(temp[y]==1)[0]
+        #     if len(xs_l)>1:
+        #         epaisseurs.append(xs_l.max()-xs_l.min())
+        # epaisseur_moyenne_rouge = np.mean(epaisseurs) if epaisseurs else 0
         
         
     else:# Si aucun groupe de pixels rouge n'a été détecté, on renvoie des valeurs nulles
@@ -421,7 +317,7 @@ def analyse_image(path_image):
         # On définit une zone de recherche : les 10% les plus à gauche, 
         # pourquoi parce que le réseau de neuronnes nest pas précis donc parfait 
         # les pixels les plus a gauche ne sont seulement une colonne de 2 pixels
-        x_threshold = x_min + int(0.10 * envergure)
+        x_threshold = x_min + int(0.01 * envergure)
         
         hauteurs_colonnes = [] # Liste pour stocker les hauteurs trouvées dans cette zone
         
@@ -447,7 +343,7 @@ def analyse_image(path_image):
     
         # Meme raisonnement que pour le saumon, mais cette fois ci pour la droite, 
         # et cette fois avec 30% (parfois le masque de l'aileron empiete sur le fuselage)
-        x_threshold = x_max - int(0.30 * envergure)
+        x_threshold = x_max - int(0.05 * envergure)
         
         hauteurs_colonnes = [] # Liste pour stocker les hauteurs trouvées dans cette zone
         
@@ -467,6 +363,49 @@ def analyse_image(path_image):
             hauteur_droite_verte = y_droite_max - y_droite_min
             x_emplanture = x_max
 
+        
+
+        # plt.figure(figsize=(6,6))
+        # plt.imshow(cleaned, cmap="gray")
+        
+        # ligne d’emplanture
+        # plt.plot(
+            # [x_emplanture, x_emplanture],
+            # [y_droite_min, y_droite_max],
+            # color="red",
+            # linewidth=2,
+            # label="Emplanture mesurée"
+        # )
+        
+        # points extrêmes (optionnel mais parlant)
+        # plt.scatter(
+            # [x_emplanture, x_emplanture],
+            # [y_droite_min, y_droite_max],
+            # color="yellow",
+            # s=30
+        # )
+        
+        
+        # plt.plot(
+            # [x_saumon, x_saumon],
+            # [y_gauche_min, y_droite_min],
+            # color="cyan",
+            # linestyle="--",
+            # linewidth=2,
+            # label="Flèche"
+        # )
+        
+        # points de référence
+        # plt.scatter(
+            # [x_saumon, x_emplanture],
+            # [y_gauche_min, y_droite_min],
+            # color="cyan",
+            # s=40
+        # )
+        # plt.legend()
+        # plt.title("Emplanture détectée sur le masque")
+        # plt.axis("off")
+        # plt.show()
 
         # ═══════════════════════════════════════════════════════════════════════════
         # FLÈCHE (décalage vertical entre le saumon et l'emplanture)
@@ -476,7 +415,7 @@ def analyse_image(path_image):
     
     else:
         fleche= hauteur_gauche_verte=hauteur_droite_verte=envergure=0 # Si aucun groupe de pixels verts n'a été détecté, on renvoie des valeurs nulles
-
+        
     # ════════════════════════════════════════════════════════════════════════════════
     # ███╗   ███╗███████╗███████╗██╗   ██╗██████╗ ███████╗███████╗
     # ████╗ ████║██╔════╝██╔════╝██║   ██║██╔══██╗██╔════╝██╔════╝
@@ -491,161 +430,323 @@ def analyse_image(path_image):
         
     masque_jaune = (cleaned==2).astype(np.uint8) # pour l'envoyer au code de pablo
     masque_rouge = (cleaned==1).astype(np.uint8) # pour l'envoyer au code de pablo
-    masque_vert = (pred_mask_original==3).astype(np.uint8) # pour l'envoyer au code de pablo
-   
-    # ─────────────────────────────────────────────────────────────────────────
-    # Calcul des échelles de conversion pixels à mètres
-    # ─────────────────────────────────────────────────────────────────────────
+    masque_vert = (cleaned==3).astype(np.uint8) # pour l'envoyer au code de pablo
+
     
-    # Hypothèse : les mires sont espacées de 1 mètre réel
+    # plt.figure()
+    # plt.imshow(masque_jaune, cmap="gray")
+    # plt.title("Masque jaune (binaire)")
+    # plt.axis("off")
+    # plt.show()
+    
+    # # plt.figure()
+    # # plt.imshow(masque_rouge, cmap="gray")
+    # # plt.title("Masque rouge (binaire)")
+    # # plt.axis("off")
+    # # plt.show()
+    
+    # plt.figure()
+    # plt.imshow(masque_vert, cmap="gray")
+    # plt.title("Masque vert (binaire)")
+    # plt.axis("off")
+    # plt.show()
+    
+    
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Chargement du modèle de détection des mires
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    # Ici on va venir charger le réseau de neuronnes préentraine pour la détection des mires
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = smp.Unet(
+        encoder_name="resnet34",
+        encoder_weights=None,
+        in_channels=3,
+        classes=2
+    )
+    
+    # Ligne ~573 (pour les mires)
+    #checkpoint_mires = torch.load("modele_mires_FINALlll.pth", map_location=device)
+    #model.load_state_dict(checkpoint_mires['model_state_dict'])
+    model.load_state_dict(torch.load("modele_mires_final_V7.pth", map_location=device))# On charge les poids du modèle entraîné
+    model.to(device)
+    model.eval()
+    
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Prédiction du masque des mires
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    img_tensor, img_np, original_size = load_image(path_image, device=device)# Charge et redimensionne l'image pour le réseau et on garde les dimensions originales
+
+    with torch.no_grad():
+        pred = model(img_tensor)
+        pred_mask = torch.argmax(pred, dim=1).squeeze(0).cpu().numpy()
+    
+    # On redimensionne le masque aux dimensions originales de l'image
+    pred_mask_original = cv2.resize(pred_mask, original_size, interpolation=cv2.INTER_NEAREST)
+    
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Extraction et nettoyage des mires détectées
+    # ─────────────────────────────────────────────────────────────────────────────
+    mask_mires_brut = (pred_mask_original == 1).astype(int)
+    labeled_array, num_features = label(mask_mires_brut)
+    #print(f"Nombre de groupes détectés : {num_features}")
+    
+    
+    
+    # ═════════════════════════════════════════════════════════════════════════════
+    # AU MOINS 4 MIRES DÉTECTÉES
+    # ═════════════════════════════════════════════════════════════════════════════
+
+    if num_features >= 4:
             
-    DISTANCE_VERTICALE_MIRES = 0.9 # Distance entre mires haut et bas
-    DISTANCE_HORIZONTALE_MIRES = 0.8 # Distance entre mires gauche et droite
+        # ─────────────────────────────────────────────────────────────────────────
+        # Sélection des 4 plus gros groupes (les vraies mires)
+        # ─────────────────────────────────────────────────────────────────────────
 
-    echelle_verticale_gauche = abs(mire_bas_gauche[0] - mire_haut_gauche[0]) / DISTANCE_VERTICALE_MIRES
-    echelle_verticale_droite = abs(mire_bas_droite[0] - mire_haut_droite[0]) / DISTANCE_VERTICALE_MIRES
-    echelle_horizontale_haut = abs(mire_haut_droite[1] - mire_haut_gauche[1]) / DISTANCE_HORIZONTALE_MIRES
-    echelle_horizontale_bas = abs(mire_bas_droite[1] - mire_bas_gauche[1]) / DISTANCE_HORIZONTALE_MIRES 
-    
-    # print("\n=== ÉCHELLES CALCULÉES ===")
-    # print(f"Verticale gauche  : {echelle_verticale_gauche:.2f} px/m")
-    # print(f"Verticale droite  : {echelle_verticale_droite:.2f} px/m")
-    # print(f"Horizontale haut  : {echelle_horizontale_haut:.2f} px/m")
-    # print(f"Horizontale bas   : {echelle_horizontale_bas:.2f} px/m")
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # Détection de la distorsion perspective
-    # ─────────────────────────────────────────────────────────────────────────
-    
-    # plus les échelles (verticale et horizontale) diffèrent beaucoup, plus l'image a une forte perspective, 
-    # et donc plus les mesures peuvent être faussées
-    # distorsion_verticale = abs(echelle_verticale_gauche - echelle_verticale_droite)
-    # distorsion_horizontale = abs(echelle_horizontale_haut - echelle_horizontale_bas)
-    
-    # if distorsion_verticale > 10:
-    #     print(f" Distorsion perspective verticale détectée : {distorsion_verticale:.2f} px")
-    # if distorsion_horizontale > 10:
-    #     print(f" Distorsion perspective horizontale détectée : {distorsion_horizontale:.2f} px")
+        sizes = [np.sum(labeled_array == i) for i in range(1, num_features+1)]    # On calcule la taille (nombre de pixels) de chaque groupe
+        sorted_labels = [i+1 for i in np.argsort(sizes)[::-1]]    # On trie les groupes par taille décroissante
+        top_4_labels = sorted_labels[:4]    # On garde seulement les 4 plus gros
+
         
-    # ─────────────────────────────────────────────────────────────────────────
-    # Fonction d'interpolation bilinéaire de l'échelle
-    # ─────────────────────────────────────────────────────────────────────────
+        # On crée maitenant un masque nettoyé avec seulement les 4 plus gros groupes
+        mask_mires_clean = np.zeros_like(mask_mires_brut)
+        for lbl in top_4_labels:
+            mask_mires_clean[labeled_array == lbl] = 1
+        
+        # On Re-labellise le masque nettoyé (labels 1, 2, 3, 4) pour reconnaitre précisément chaque mires
+        labeled_array_clean, _ = label(mask_mires_clean)
+        
+        
+        # ─────────────────────────────────────────────────────────────────────────
+        # Calcul des centres de masse des 4 mires
+        # ─────────────────────────────────────────────────────────────────────────
+
+        centers = []
+        for lbl in range(1, 5):  # Labels 1, 2, 3, 4
+            # On isole le groupe de pixels de cette mire
+            group_mask = (labeled_array_clean == lbl).astype(int)
+            # On calcule son centre de masse (coordonnées moyennes pondérées)
+            center = center_of_mass(group_mask)
+            centers.append(center)
+            #print(f"Centre mire {lbl}: ({center[0]:.1f}, {center[1]:.1f})")
+        
+        # ─────────────────────────────────────────────────────────────────────────
+        # Identification des 4 coins du rectangle de référence
+        # ─────────────────────────────────────────────────────────────────────────
+        
+        # On trie les centres par coordonnée Y (du haut vers le bas)
+        centers_sorted_y = sorted(centers, key=lambda c: c[0])
+        
+        # On sépare les 2 mires du haut et les 2 du bas
+        top_2 = sorted(centers_sorted_y[:2], key=lambda c: c[1])     # Trié par X
+        bottom_2 = sorted(centers_sorted_y[2:], key=lambda c: c[1])  # Trié par X
+        
+        # Assigne chaque coin
+        mire_haut_gauche = top_2[0]      # Coin supérieur gauche
+        mire_haut_droite = top_2[1]      # Coin supérieur droit
+        mire_bas_gauche = bottom_2[0]    # Coin inférieur gauche
+        mire_bas_droite = bottom_2[1]    # Coin inférieur droit
+        
+        # print("\n=== POSITION DES MIRES ===")
+        # print(f"Haut-Gauche  : ({mire_haut_gauche[0]:.1f}, {mire_haut_gauche[1]:.1f})")
+        # print(f"Haut-Droite  : ({mire_haut_droite[0]:.1f}, {mire_haut_droite[1]:.1f})")
+        # print(f"Bas-Gauche   : ({mire_bas_gauche[0]:.1f}, {mire_bas_gauche[1]:.1f})")
+        # print(f"Bas-Droite   : ({mire_bas_droite[0]:.1f}, {mire_bas_droite[1]:.1f})")
+        
+        # ─────────────────────────────────────────────────────────────────────────
+        # Calcul des échelles de conversion pixels à mètres
+        # ─────────────────────────────────────────────────────────────────────────
+        
+        DISTANCE_VERTICALE_MIRES = 0.9      # Distance entre mires haut et bas
+        DISTANCE_HORIZONTALE_MIRES = 0.8  # Distance entre mires gauche et droite
+        
+        # Hypothèse : les mires sont espacées de 1 mètre réel
                 
-    def calculer_echelle_verticale_locale(y, x):
-        """
-        Calcule l'échelle VERTICALE locale (pour hauteurs).
-        Retourne px/m pour les distances verticales.
-        """
-        # Calcul des ratios
-        hauteur_rect = (mire_bas_gauche[0] + mire_bas_droite[0]) / 2 - \
-                        (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
-        largeur_rect = (mire_haut_droite[1] + mire_bas_droite[1]) / 2 - \
-                        (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+        echelle_verticale_gauche = abs(mire_bas_gauche[0] - mire_haut_gauche[0]) / DISTANCE_VERTICALE_MIRES
+        echelle_verticale_droite = abs(mire_bas_droite[0] - mire_haut_droite[0]) / DISTANCE_VERTICALE_MIRES
+        echelle_horizontale_haut = abs(mire_haut_droite[1] - mire_haut_gauche[1]) / DISTANCE_HORIZONTALE_MIRES
+        echelle_horizontale_bas = abs(mire_bas_droite[1] - mire_bas_gauche[1]) / DISTANCE_HORIZONTALE_MIRES
         
-        y_min = (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
-        x_min = (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+        # print("\n=== ÉCHELLES CALCULÉES ===")
+        # print(f"Verticale gauche  : {echelle_verticale_gauche:.2f} px/m")
+        # print(f"Verticale droite  : {echelle_verticale_droite:.2f} px/m")
+        # print(f"Horizontale haut  : {echelle_horizontale_haut:.2f} px/m")
+        # print(f"Horizontale bas   : {echelle_horizontale_bas:.2f} px/m")
         
-        ratio_y = max(0, min(1, (y - y_min) / hauteur_rect if hauteur_rect > 0 else 0.5))
-        ratio_x = max(0, min(1, (x - x_min) / largeur_rect if largeur_rect > 0 else 0.5))
+        # ─────────────────────────────────────────────────────────────────────────
+        # Détection de la distorsion perspective
+        # ─────────────────────────────────────────────────────────────────────────
         
-        # Interpolation des échelles VERTICALES
-        echelle_locale = echelle_verticale_gauche * (1 - ratio_x) + \
-                            echelle_verticale_droite * ratio_x
+        # plus les échelles (verticale et horizontale) diffèrent beaucoup, plus l'image a une forte perspective, 
+        # et donc plus les mesures peuvent être faussées
+        # distorsion_verticale = abs(echelle_verticale_gauche - echelle_verticale_droite)
+        # distorsion_horizontale = abs(echelle_horizontale_haut - echelle_horizontale_bas)
         
-        # Note : On pourrait aussi interpoler verticalement, mais pour les échelles
-        # verticales, la variation est surtout horizontale (perspective gauche-droite)
+        # if distorsion_verticale > 10:
+        #     print(f" Distorsion perspective verticale détectée : {distorsion_verticale:.2f} px")
+        # if distorsion_horizontale > 10:
+        #     print(f" Distorsion perspective horizontale détectée : {distorsion_horizontale:.2f} px")
+            
+        # ─────────────────────────────────────────────────────────────────────────
+        # Fonction d'interpolation bilinéaire de l'échelle
+        # ─────────────────────────────────────────────────────────────────────────
+                    
+        def calculer_echelle_verticale_locale(y, x):
+            """
+            Calcule l'échelle VERTICALE locale (pour hauteurs).
+            Retourne px/m pour les distances verticales.
+            """
+            # Calcul des ratios
+            hauteur_rect = (mire_bas_gauche[0] + mire_bas_droite[0]) / 2 - \
+                           (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
+            largeur_rect = (mire_haut_droite[1] + mire_bas_droite[1]) / 2 - \
+                           (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+            
+            y_min = (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
+            x_min = (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+            
+            ratio_y = max(0, min(1, (y - y_min) / hauteur_rect if hauteur_rect > 0 else 0.5))
+            ratio_x = max(0, min(1, (x - x_min) / largeur_rect if largeur_rect > 0 else 0.5))
+            
+            # Interpolation des échelles VERTICALES
+            echelle_locale = echelle_verticale_gauche * (1 - ratio_x) + \
+                             echelle_verticale_droite * ratio_x
+            
+            # Note : On pourrait aussi interpoler verticalement, mais pour les échelles
+            # verticales, la variation est surtout horizontale (perspective gauche-droite)
+            
+            return echelle_locale
         
-        return echelle_locale
-    
-    
-    def calculer_echelle_horizontale_locale(y, x):
-        """
-        Calcule l'échelle HORIZONTALE locale (pour largeurs, envergures).
-        Retourne px/m pour les distances horizontales.
-        """
-        # Calcul des ratios
-        hauteur_rect = (mire_bas_gauche[0] + mire_bas_droite[0]) / 2 - \
-                        (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
-        largeur_rect = (mire_haut_droite[1] + mire_bas_droite[1]) / 2 - \
-                        (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
         
-        y_min = (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
-        x_min = (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+        def calculer_echelle_horizontale_locale(y, x):
+            """
+            Calcule l'échelle HORIZONTALE locale (pour largeurs, envergures).
+            Retourne px/m pour les distances horizontales.
+            """
+            # Calcul des ratios
+            hauteur_rect = (mire_bas_gauche[0] + mire_bas_droite[0]) / 2 - \
+                           (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
+            largeur_rect = (mire_haut_droite[1] + mire_bas_droite[1]) / 2 - \
+                           (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+            
+            y_min = (mire_haut_gauche[0] + mire_haut_droite[0]) / 2
+            x_min = (mire_haut_gauche[1] + mire_bas_gauche[1]) / 2
+            
+            ratio_y = max(0, min(1, (y - y_min) / hauteur_rect if hauteur_rect > 0 else 0.5))
+            ratio_x = max(0, min(1, (x - x_min) / largeur_rect if largeur_rect > 0 else 0.5))
+            
+            # Interpolation des échelles HORIZONTALES
+            echelle_locale = echelle_horizontale_haut * (1 - ratio_y) + \
+                             echelle_horizontale_bas * ratio_y
+            
+            # Note : On pourrait aussi interpoler horizontalement, mais pour les échelles
+            # horizontales, la variation est surtout verticale (perspective haut-bas)
+            
+            return echelle_locale
         
-        ratio_y = max(0, min(1, (y - y_min) / hauteur_rect if hauteur_rect > 0 else 0.5))
-        ratio_x = max(0, min(1, (x - x_min) / largeur_rect if largeur_rect > 0 else 0.5))
-        
-        # Interpolation des échelles HORIZONTALES
-        echelle_locale = echelle_horizontale_haut * (1 - ratio_y) + \
-                            echelle_horizontale_bas * ratio_y
-        
-        # Note : On pourrait aussi interpoler horizontalement, mais pour les échelles
-        # horizontales, la variation est surtout verticale (perspective haut-bas)
-        
-        return echelle_locale
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # Calcul des positions moyennes des éléments de la fusée
-    # ─────────────────────────────────────────────────────────────────────────
+        # ─────────────────────────────────────────────────────────────────────────
+        # Calcul des positions moyennes des éléments de la fusée
+        # ─────────────────────────────────────────────────────────────────────────
 
-    # Position moyenne du fuselage (pour adapter l'échelle locale)
-    if comps[1]:  # Fuselage rouge
-        y_moyen_fuselage = np.mean([p[0] for p in comps[1][0]])
-        x_moyen_fuselage = np.mean([p[1] for p in comps[1][0]])
+        # Position moyenne du fuselage (pour adapter l'échelle locale)
+        if comps[1]:  # Fuselage rouge
+            y_moyen_fuselage = np.mean([p[0] for p in comps[1][0]])
+            x_moyen_fuselage = np.mean([p[1] for p in comps[1][0]])
+        else:
+            y_moyen_fuselage = original_size[1] / 2
+            x_moyen_fuselage = original_size[0] / 2
+        
+        
+        # Position moyenne de la coiffe
+        if comps[2]:
+            y_moyen_coiffe = np.mean([p[0] for p in comps[2][0]])
+            x_moyen_coiffe = np.mean([p[1] for p in comps[2][0]])
+        else:
+            y_moyen_coiffe = y_moyen_fuselage  # Fallback
+            x_moyen_coiffe = x_moyen_fuselage
+            
+            
+        # Position moyenne de l'aileron
+        if comps[3]:  # Aileron vert
+            y_moyen_aileron = np.mean([p[0] for p in comps[3][0]])
+            x_moyen_aileron = np.mean([p[1] for p in comps[3][0]])
+        else:
+            y_moyen_aileron = y_moyen_fuselage
+            x_moyen_aileron = x_moyen_fuselage
+        
+        
+
+        # ─────────────────────────────────────────────────────────────────────────
+        # Conversion des longueurs en mètres
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # Calcul du facteur de correction du au fait que la fusée et le fond 
+        # ne sont pas dans le meme plan
+        facteur = facteur_correction(1.2, 0.2)  # Hypothèse appareil photo a 1.20 m du fond, et fusée séparé de 13 cm du fond
+        #facteur=1
+        
+        # FUSELAGE
+        echelle_vert_fuselage = calculer_echelle_verticale_locale(y_moyen_fuselage, x_moyen_fuselage)
+        echelle_horiz_fuselage = calculer_echelle_horizontale_locale(y_moyen_fuselage, x_moyen_fuselage)
+        
+        hauteur_rouge_m = (hauteur_rouge / echelle_vert_fuselage) * 1000 / facteur  # Hauteur = vertical
+        epaisseur_moyenne_rouge_m = (epaisseur_moyenne_rouge / echelle_horiz_fuselage) * 1000 / facteur  # Diamètre = horizontal
+
+        # COIFFE
+        echelle_vert_coiffe = calculer_echelle_verticale_locale(y_moyen_coiffe, x_moyen_coiffe)
+        hauteur_jaune_m = (hauteur_jaune / echelle_vert_coiffe) * 1000 / facteur  # Hauteur = vertical
+        
+        # AILERON
+        echelle_vert_saumon = calculer_echelle_verticale_locale((y_gauche_min + y_gauche_max)/2, x_saumon)
+        echelle_vert_emplanture = calculer_echelle_verticale_locale((y_droite_min + y_droite_max)/2, x_emplanture)
+        echelle_horiz_aileron = calculer_echelle_horizontale_locale(y_moyen_aileron, x_moyen_aileron)
+        
+        hauteur_gauche_verte_m = (hauteur_gauche_verte / echelle_vert_saumon) * 1000 / facteur  # Hauteur = vertical
+        hauteur_droite_verte_m = (hauteur_droite_verte / echelle_vert_emplanture) * 1000 / facteur  # Hauteur = vertical
+        envergure_m = (envergure / echelle_horiz_aileron) * 1000 / facteur  # Envergure = horizontal
+        
+        # Flèche = vertical, moyenne des deux échelles
+        echelle_fleche = (echelle_vert_saumon + echelle_vert_emplanture) / 2
+        fleche_m = (fleche / echelle_fleche) * 1000 / facteur
+
+
+        # print("\n=== MESURES EN MÈTRES (avec correction perspective) ===")
+        # print(f"Hauteur fuselage          : {hauteur_rouge_m:.0f} mm")
+        # print(f"Épaisseur moyenne fuselage: {epaisseur_moyenne_rouge_m:.0f} mm")
+        # print(f"Hauteur coiffe            : {hauteur_jaune_m:.0f} mm")
+        # print(f"Flèche                    : {fleche_m:.0f} mm")
+        # print(f"Saumon (hauteur gauche)   : {hauteur_gauche_verte_m:.0f} mm")
+        # print(f"Emplanture (hauteur droite): {hauteur_droite_verte_m:.0f} mm")
+        # print(f"Envergure                 : {envergure_m:.0f} mm")
+        
+        
+        
+        # plt.figure(figsize=(10, 10))
+        # plt.imshow(mask_mires_clean, cmap='gray', alpha=0.7)
+        
+        # Tracer les mires et leurs connexions
+        mires_plot = [mire_haut_gauche, mire_haut_droite, mire_bas_droite, mire_bas_gauche, mire_haut_gauche]
+        ys = [m[0] for m in mires_plot]
+        xs = [m[1] for m in mires_plot]
+        # plt.plot(xs, ys, 'r-', linewidth=2, label='Rectangle de référence')
+        
+        # for i, (name, mire) in enumerate([
+            # ('HG', mire_haut_gauche),
+            # ('HD', mire_haut_droite),
+            # ('BG', mire_bas_gauche),
+            # ('BD', mire_bas_droite)
+        # ]):
+            # plt.plot(mire[1], mire[0], 'ro', markersize=12)
+            # plt.text(mire[1]+20, mire[0], name, color='red', fontsize=12, fontweight='bold')
+        
+        # plt.title("Les 4 mires détectées (nettoyées)")
+        # plt.legend()
+        # plt.axis("off")
+        # plt.show()
+        
     else:
-        y_moyen_fuselage = original_size[1] / 2
-        x_moyen_fuselage = original_size[0] / 2
-    
-    
-    # Position moyenne de la coiffe
-    if comps[2]:
-        y_moyen_coiffe = np.mean([p[0] for p in comps[2][0]])
-        x_moyen_coiffe = np.mean([p[1] for p in comps[2][0]])
-    else:
-        y_moyen_coiffe = y_moyen_fuselage  # Fallback
-        x_moyen_coiffe = x_moyen_fuselage
-        
-        
-    # Position moyenne de l'aileron
-    if comps[3]:  # Aileron vert
-        y_moyen_aileron = np.mean([p[0] for p in comps[3][0]])
-        x_moyen_aileron = np.mean([p[1] for p in comps[3][0]])
-    else:
-        y_moyen_aileron = y_moyen_fuselage
-        x_moyen_aileron = x_moyen_fuselage
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # Conversion des longueurs en mètres
-    # ─────────────────────────────────────────────────────────────────────────
-
-    # Calcul du facteur de correction du au fait que la fusée et le fond 
-    # ne sont pas dans le meme plan
-    facteur = facteur_correction(1.20, 0.20)  # Hypothèse appareil photo a 1.20 m du fond, et fusée séparé de 13 cm du fond
-
-    # FUSELAGE
-    echelle_vert_fuselage = calculer_echelle_verticale_locale(y_moyen_fuselage, x_moyen_fuselage)
-    echelle_horiz_fuselage = calculer_echelle_horizontale_locale(y_moyen_fuselage, x_moyen_fuselage)
-    
-    hauteur_rouge_m = (hauteur_rouge / echelle_vert_fuselage) * 1000 / facteur  # Hauteur = vertical
-    epaisseur_moyenne_rouge_m = (epaisseur_moyenne_rouge / echelle_horiz_fuselage) * 1000 / facteur  # Diamètre = horizontal
-
-    # COIFFE
-    echelle_vert_coiffe = calculer_echelle_verticale_locale(y_moyen_coiffe, x_moyen_coiffe)
-    hauteur_jaune_m = (hauteur_jaune / echelle_vert_coiffe) * 1000 / facteur  # Hauteur = vertical
-    
-    # AILERON
-    echelle_vert_saumon = calculer_echelle_verticale_locale((y_gauche_min + y_gauche_max)/2, x_saumon)
-    echelle_vert_emplanture = calculer_echelle_verticale_locale((y_droite_min + y_droite_max)/2, x_emplanture)
-    echelle_horiz_aileron = calculer_echelle_horizontale_locale(y_moyen_aileron, x_moyen_aileron)
-    
-    hauteur_gauche_verte_m = (hauteur_gauche_verte / echelle_vert_saumon) * 1000 / facteur  # Hauteur = vertical
-    hauteur_droite_verte_m = (hauteur_droite_verte / echelle_vert_emplanture) * 1000 / facteur  # Hauteur = vertical
-    envergure_m = (envergure / echelle_horiz_aileron) * 1000 / facteur  # Envergure = horizontal
-    
-    # Flèche = vertical, moyenne des deux échelles
-    echelle_fleche = (echelle_vert_saumon + echelle_vert_emplanture) / 2
-    fleche_m = (fleche / echelle_fleche) * 1000 / facteur
-
+        raise ValueError(f"Calibration impossible : seulement {num_features} mire(s) détectée(s). Il en faut au moins 4.")
         
     return (
         hauteur_rouge_m,           # hauteur du fuselage
@@ -655,7 +756,7 @@ def analyse_image(path_image):
         hauteur_gauche_verte_m,    # saumon (hauteur du bord gauche, robuste)
         hauteur_droite_verte_m,    # emplanture (hauteur bord droit, robuste)
         envergure_m,               # largeur totale de l'aileron
-        masque_jaune,              # masque binaire de la coiffe
+        masque_jaune,            # masque binaire de la coiffe
         # cleaned,                 # masque nettoyé de tous les éléments
         # aileron_gauche,          # liste des pixels de l'aileron gauche
         # x_emplanture,            # coordonnée X du bord droit de l'aileron (emplanture)
