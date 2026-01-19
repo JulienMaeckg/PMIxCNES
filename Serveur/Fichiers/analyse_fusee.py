@@ -1,5 +1,6 @@
 from scipy.ndimage import label, center_of_mass
 import segmentation_models_pytorch as smp
+import aileronsDim as ail
 import numpy as np
 import torch
 import cv2
@@ -431,7 +432,7 @@ def analyse_image(path_image):
     masque_jaune = (cleaned==2).astype(np.uint8) # pour l'envoyer au code de pablo
     masque_rouge = (cleaned==1).astype(np.uint8) # pour l'envoyer au code de pablo
     masque_vert = (cleaned==3).astype(np.uint8) # pour l'envoyer au code de pablo
-
+    emplanture_j, envergure_j, fleche_j, saumon_j = ail.ailerons(masque_vert, False)
     
     # plt.figure()
     # plt.imshow(masque_jaune, cmap="gray")
@@ -702,13 +703,13 @@ def analyse_image(path_image):
         echelle_vert_emplanture = calculer_echelle_verticale_locale((y_droite_min + y_droite_max)/2, x_emplanture)
         echelle_horiz_aileron = calculer_echelle_horizontale_locale(y_moyen_aileron, x_moyen_aileron)
         
-        hauteur_gauche_verte_m = (hauteur_gauche_verte / echelle_vert_saumon) * 1000 / facteur  # Hauteur = vertical
-        hauteur_droite_verte_m = (hauteur_droite_verte / echelle_vert_emplanture) * 1000 / facteur  # Hauteur = vertical
-        envergure_m = (envergure / echelle_horiz_aileron) * 1000 / facteur  # Envergure = horizontal
+        hauteur_gauche_verte_m = (saumon_j / echelle_vert_saumon) * 1000 / facteur  # Hauteur = vertical
+        hauteur_droite_verte_m = (emplanture_j / echelle_vert_emplanture) * 1000 / facteur  # Hauteur = vertical
+        envergure_m = (envergure_j / echelle_horiz_aileron) * 1000 / facteur  # Envergure = horizontal
         
         # Flèche = vertical, moyenne des deux échelles
         echelle_fleche = (echelle_vert_saumon + echelle_vert_emplanture) / 2
-        fleche_m = (fleche / echelle_fleche) * 1000 / facteur
+        fleche_m = (fleche_j / echelle_fleche) * 1000 / facteur
 
 
         # print("\n=== MESURES EN MÈTRES (avec correction perspective) ===")
