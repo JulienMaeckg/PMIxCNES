@@ -134,7 +134,7 @@ class RoundedButton(Button):
 
     def __init__(self, **kwargs):
         # Récupération de la couleur de fond personnalisée, gris par défaut
-        self._bg_color = kwargs.pop("background_color", (0.8, 0.8, 0.8, 1))
+        self._bg_color = kwargs.pop("background_color", (0.384, 0.580, 0.604, 1))
 
         # Initialisation de la classe parente Button
         super().__init__(**kwargs)
@@ -165,7 +165,7 @@ class RoundedButton(Button):
 
     def _on_press(self, *args):
         """Change la couleur de fond en gris foncé lors de l'appui sur le bouton."""
-        self.bg_color.rgba = (0.4, 0.4, 0.4, 1)
+        self.bg_color.rgba = (0.3115, 0.4665, 0.492, 1)
 
     def _on_release(self, *args):
         """Restaure la couleur de fond initiale lorsque le bouton est relâché."""
@@ -177,7 +177,7 @@ class RoundedButton(Button):
         if hasattr(self, 'bg_color'):
             if value:  # Si désactivé (True)
                 # On le met en gris foncé
-                self.bg_color.rgba = (0.6, 0.6, 0.6, 1) 
+                self.bg_color.rgba = (0.239, 0.353, 0.380, 1) 
             else:      # Si activé (False)
                 # On remet la couleur d'origine
                 self.bg_color.rgba = self._bg_color
@@ -188,7 +188,7 @@ class RoundedSpinner(Spinner):
 
     def __init__(self, **kwargs):
         # Extraction de la couleur de fond
-        self._bg_color = kwargs.pop("background_color", (0.8, 0.8, 0.8, 1))
+        self._bg_color = kwargs.pop("background_color", (0.384, 0.580, 0.604, 1))
 
         # Initialisation de la classe parente Spinner
         super().__init__(**kwargs)
@@ -224,11 +224,31 @@ class RoundedSpinner(Spinner):
             if hasattr(self, "_dropdown") and self._dropdown:
                 dropdown = self._dropdown
 
-                # Configuration du conteneur de la liste (fond blanc)
-                dropdown.background_color = (1, 1, 1, 1)
+                # 1. Configuration du conteneur (Transparent)
+                dropdown.background_color = (0, 0, 0, 0)
+                dropdown.background_normal = ''
+                dropdown.auto_width = False
                 dropdown.spacing = sp(1)
 
-                # Nettoyage des options existantes pour les reconstruire proprement
+                # 2. Fonction de mise à jour dynamique (Largeur + Centrage)
+                # Cette fonction recalcule les marges à chaque changement de taille
+                def update_dropdown_layout(*args):
+                    dropdown.width = self.width
+                    
+                    # On garde votre ratio de 90% (0.9)
+                    largeur_menu_souhaitee = self.width * 0.8
+                    marge_cote = (self.width - largeur_menu_souhaitee) / 2
+                    
+                    if dropdown.container:
+                        dropdown.container.padding = [marge_cote, 0, marge_cote, 0]
+
+                # 3. Lier la mise à jour à la taille du bouton Spinner
+                # C'est ce qui corrige le problème de redimensionnement de fenêtre
+                self.bind(size=update_dropdown_layout)
+                # Appel initial
+                update_dropdown_layout()
+
+                # Nettoyage et reconstruction de la liste
                 dropdown.clear_widgets()
 
                 for value in self.values:
@@ -240,19 +260,27 @@ class RoundedSpinner(Spinner):
                         text=value,
                         size_hint_y=None,
                         height=sp(40),
+                        size_hint_x=1, # Remplit l'espace entre les marges calculées
                         background_normal="",
                         background_down="",
-                        background_color=(0.95, 0.95, 0.95, 1),
-                        color=(0, 0, 0, 1),
+                        
+                        # --- VOS COULEURS CONSERVÉES ---
+                        # Fond clair (Cyan pâle)
+                        background_color=(0.742, 0.852, 0.848, 1),
+                        # Texte sombre (Bleu nuit)
+                        color=(0.090, 0.114, 0.129, 1),
+                        
                         font_size=dropdown_font_size,
                     )
 
-                    # Définition des fonctions pour l'effet de survol/appui
+                    # --- GESTION DES COULEURS AU CLIC ---
                     def on_btn_press(instance):
-                        instance.background_color = (0.85, 0.85, 0.85, 1)
+                        # Couleur foncée au clic (Teal foncé)
+                        instance.background_color = (0.239, 0.353, 0.380, 1)
 
                     def on_btn_release(instance):
-                        instance.background_color = (0.95, 0.95, 0.95, 1)
+                        # Retour à la couleur normale au relâchement
+                        instance.background_color = (0.742, 0.852, 0.848, 1)
 
                     # Attribution des effets visuels au bouton
                     btn.bind(on_press=on_btn_press)
@@ -349,9 +377,9 @@ class VulcainApp(App):
         # Surveillance du redimensionnement de la fenêtre pour l'adaptabilité
         Window.bind(on_resize=self.on_window_resize)
 
-        # Mise en place du fond blanc de l'application
+        # Mise en place du fond de l'application
         with Window.canvas.before:
-            Color(1, 1, 1, 1)
+            Color(0.792, 0.902, 0.898, 1)
             self.bg_rect = Rectangle(pos=(0, 0), size=Window.size)
         # Liaison de la taille du fond à celle de la fenêtre
         Window.bind(size=lambda instance, value: setattr(self.bg_rect, "size", value))
@@ -387,17 +415,17 @@ class VulcainApp(App):
 
         # Titre de l'application
         self.title_label = Label(
-            text="VULCAIN",
+            text="Vulcain",
             font_size=self.sp(45),
             size_hint_y=0.1,
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             bold=True,
         )
         layout.add_widget(self.title_label)
 
         # Étiquette de section pour les ailerons
         self.ailerons_label = Label(
-            text="Ailerons", font_size=self.sp(35), size_hint_y=0.1, color=(0, 0, 0, 1)
+            text="Ailerons", font_size=self.sp(35), size_hint_y=0.1, color=(0.090, 0.114, 0.129, 1)
         )
         layout.add_widget(self.ailerons_label)
 
@@ -406,7 +434,7 @@ class VulcainApp(App):
         self.aileron_bas_label = Label(
             text="Nombre :",
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_x=0.6,
         )
         aileron_bas_layout.add_widget(self.aileron_bas_label)
@@ -416,8 +444,8 @@ class VulcainApp(App):
             values=("3", "4", "5", "6"),
             size_hint_x=0.4,
             font_size=self.sp(25),
-            background_color=(0.8, 0.8, 0.8, 1),
-            color=(0, 0, 0, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         # Liaison pour la mise à jour de la police à l'ouverture du menu
         self.aileron_bas_spinner.bind(on_release=self._on_spinner_open)
@@ -432,7 +460,7 @@ class VulcainApp(App):
         self.aileron_bas_epaisseur_label = Label(
             text="Épaisseur (mm) :",
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_x=0.6,
         )
         aileron_bas_epaisseur_layout.add_widget(self.aileron_bas_epaisseur_label)
@@ -442,8 +470,8 @@ class VulcainApp(App):
             values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"),
             size_hint_x=0.4,
             font_size=self.sp(25),
-            background_color=(0.8, 0.8, 0.8, 1),
-            color=(0, 0, 0, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         # Liaison pour la mise à jour de la police à l'ouverture du menu
         self.aileron_bas_epaisseur_spinner.bind(on_release=self._on_spinner_open)
@@ -458,7 +486,7 @@ class VulcainApp(App):
         self.aileron_haut_label = Label(
             text="Ailerons du haut :",
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_x=0.6,
         )
         aileron_haut_layout.add_widget(self.aileron_haut_label)
@@ -467,8 +495,8 @@ class VulcainApp(App):
             values=("0", "2", "3", "4", "5", "6"),
             size_hint_x=0.4,
             font_size=self.sp(25),
-            background_color=(0.8, 0.8, 0.8, 1),
-            color=(0, 0, 0, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         self.aileron_haut_spinner.bind(on_release=self._on_spinner_open)
         self.aileron_haut_spinner.bind(text=self.on_aileron_change)
@@ -480,7 +508,7 @@ class VulcainApp(App):
         self.aileron_haut_epaisseur_label = Label(
             text="Épaisseur (mm) :",
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_x=0.6,
         )
         aileron_haut_epaisseur_layout.add_widget(self.aileron_haut_epaisseur_label)
@@ -490,8 +518,8 @@ class VulcainApp(App):
             values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"),
             size_hint_x=0.4,
             font_size=self.sp(25),
-            background_color=(0.8, 0.8, 0.8, 1),
-            color=(0, 0, 0, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         # Liaison pour la mise à jour de la police à l'ouverture du menu
         self.aileron_haut_epaisseur_spinner.bind(on_release=self._on_spinner_open)
@@ -502,31 +530,9 @@ class VulcainApp(App):
 
         # Étiquette de section pour le scannage
         self.scannage_label = Label(
-            text="Scannage", font_size=self.sp(35), size_hint_y=0.1, color=(0, 0, 0, 1)
+            text="Scannage", font_size=self.sp(35), size_hint_y=0.1, color=(0.169, 0.220, 0.271, 1)
         )
         # layout.add_widget(self.scannage_label)
-
-        # Boutons d'action pour le scan et le calcul
-        scannage_buttons_layout = BoxLayout(
-            orientation="horizontal", size_hint_y=0.1, spacing=self.pad(10)
-        )
-        self.bouton_scan = RoundedButton(
-            text="Scanner fusée",
-            background_color=(0.8, 0.8, 0.8, 1),
-            font_size=self.sp(25),
-            color=(0, 0, 0, 1),
-        )
-        self.bouton_scan.bind(on_release=self.afficher_choix_source_image)
-        self.bouton_calcul = RoundedButton(
-            text="Extraire dimensions",
-            background_color=(0.8, 0.8, 0.8, 1),
-            font_size=self.sp(25),
-            color=(0, 0, 0, 1),
-        )
-        self.bouton_calcul.bind(on_release=self.lancer_calcul_stabilite)
-        scannage_buttons_layout.add_widget(self.bouton_scan)
-        scannage_buttons_layout.add_widget(self.bouton_calcul)
-        layout.add_widget(scannage_buttons_layout)
 
         # Label de statut affichant l'état courant de l'application (EN ATTENTE, etc.)
         self.infos_label = Label(
@@ -534,9 +540,31 @@ class VulcainApp(App):
             markup=True,
             font_size=self.sp(30),
             size_hint_y=0.1,
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         layout.add_widget(self.infos_label)
+
+        # Boutons d'action pour le scan et le calcul
+        scannage_buttons_layout = BoxLayout(
+            orientation="horizontal", size_hint_y=0.1, spacing=self.pad(10)
+        )
+        self.bouton_scan = RoundedButton(
+            text="Scanner fusée",
+            background_color=(0.384, 0.580, 0.604, 1),
+            font_size=self.sp(25),
+            color=(0.090, 0.114, 0.129, 1),
+        )
+        self.bouton_scan.bind(on_release=self.afficher_choix_source_image)
+        self.bouton_calcul = RoundedButton(
+            text="Extraire dimensions",
+            background_color=(0.384, 0.580, 0.604, 1),
+            font_size=self.sp(25),
+            color=(0.090, 0.114, 0.129, 1),
+        )
+        self.bouton_calcul.bind(on_release=self.lancer_calcul_stabilite)
+        scannage_buttons_layout.add_widget(self.bouton_scan)
+        scannage_buttons_layout.add_widget(self.bouton_calcul)
+        layout.add_widget(scannage_buttons_layout)
 
         # Zone des boutons utilitaires en bas d'écran
         bottom_buttons_layout = BoxLayout(
@@ -544,37 +572,37 @@ class VulcainApp(App):
         )
         self.bouton_details = RoundedButton(
             text="Afficher les résultats",
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
 
         self.bouton_identifiants = RoundedButton(
             text="Identification SPOCK",
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         
         self.bouton_send_api = RoundedButton(
             text="Envoyer les données",
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
 
         self.bouton_reset = RoundedButton(
             text="Réinitialiser",
-            background_color=(0.8, 0.8, 0.8, 1),
-            color=(0, 0, 0, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
+            color=(0.090, 0.114, 0.129, 1),
             font_size=self.sp(25),
         )
 
         self.bouton_guide = RoundedButton(
             text="Guide d'utilisation",
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
 
         self.bouton_details.bind(on_release=self.afficher_details)
@@ -679,28 +707,46 @@ class VulcainApp(App):
             print(f"[INTENT] Scheme: {parsed.scheme}")
             print(f"[INTENT] Host: {parsed.netloc}")
 
-            # Validation du protocole personnalisé
-            if parsed.scheme != "vulcainpmi":
-                print(
-                    f"[INTENT] Scheme incorrect (attendu: vulcainpmi, reçu: {parsed.scheme})"
-                )
-                return False
-
-            # Validation de l'hôte
-            if parsed.netloc != "ouvrir":
-                print(
-                    f"[INTENT] Host incorrect (attendu: ouvrir, reçu: {parsed.netloc})"
-                )
-                return False
-
             # Vérification de la présence d'au moins un paramètre d'identification
             params = parse_qs(parsed.query)
             has_spock_params = any(param in params for param in ["id", "key"])
 
-            print(f"[INTENT] Paramètres trouvés: {list(params.keys())}")
-            print(f"[INTENT] A des paramètres SPOCK: {has_spock_params}")
+            # Cas 1: Lien avec le schéma personnalisé vulcainpmi://
+            if parsed.scheme == "vulcainpmi":
+                if parsed.netloc != "ouvrir":
+                    print(
+                        f"[INTENT] Host incorrect (attendu: ouvrir, reçu: {parsed.netloc})"
+                    )
+                    return False
+                
+                print(f"[INTENT] Paramètres trouvés: {list(params.keys())}")
+                print(f"[INTENT] A des paramètres SPOCK: {has_spock_params}")
+                return has_spock_params
 
-            return has_spock_params
+            # Cas 2: Lien HTTPS depuis planete-sciences.org
+            elif parsed.scheme == "https":
+                if parsed.netloc != "www.planete-sciences.org":
+                    print(
+                        f"[INTENT] Domaine HTTPS non autorisé: {parsed.netloc}"
+                    )
+                    return False
+                
+                if not parsed.path.startswith("/espace/spock/api.html"):
+                    print(
+                        f"[INTENT] Chemin HTTPS non autorisé: {parsed.path}"
+                    )
+                    return False
+                
+                print(f"[INTENT] Lien HTTPS SPOCK détecté")
+                print(f"[INTENT] Paramètres trouvés: {list(params.keys())}")
+                print(f"[INTENT] A des paramètres SPOCK: {has_spock_params}")
+                return has_spock_params
+
+            else:
+                print(
+                    f"[INTENT] Scheme non supporté: {parsed.scheme}"
+                )
+                return False
 
         except Exception as e:
             # Capture des erreurs d'analyse syntaxique de l'URL
@@ -711,11 +757,11 @@ class VulcainApp(App):
             """Change la couleur du texte du bouton SPOCK en bleu si ID et KEY sont présents."""
             if self.SPOCK_id and self.SPOCK_key:
                 # Bleu si les deux sont remplis
-                self.bouton_identifiants.color = (0, 0, 1, 1) 
+                self.bouton_identifiants.color = (0.620, 0.906, 0.898, 1) 
                 self.bouton_identifiants.bold = True
             else:
                 # Noir sinon
-                self.bouton_identifiants.color = (0, 0, 0, 1)
+                self.bouton_identifiants.color = (0.090, 0.114, 0.129, 1)
                 self.bouton_identifiants.bold = False
 
     def process_SPOCK_link(self, link):
@@ -923,7 +969,7 @@ class VulcainApp(App):
             self.update_buttons_state()
 
             # Repassage au statut "Données extraites" (vert)
-            couleur = "00ff00"
+            couleur = "4db8de"
             texte = "DONNÉES EXTRAITES !"
             self.texte_base = texte
             self.couleur = couleur
@@ -942,18 +988,18 @@ class VulcainApp(App):
             # Bouton pour déclencher la caméra
             btn_camera = RoundedButton(
                 text="Prendre une photo",
-                background_color=(0.8, 0.8, 0.8, 1),
+                background_color=(0.384, 0.580, 0.604, 1),
                 font_size=self.sp(27),
-                color=(0, 0, 0, 1),
+                color=(0.090, 0.114, 0.129, 1),
                 size_hint_y=0.4,
             )
 
             # Bouton pour ouvrir la galerie d'images
             btn_galerie = RoundedButton(
                 text="Choisir depuis la galerie",
-                background_color=(0.8, 0.8, 0.8, 1),
+                background_color=(0.384, 0.580, 0.604, 1),
                 font_size=self.sp(27),
-                color=(0, 0, 0, 1),
+                color=(0.090, 0.114, 0.129, 1),
                 size_hint_y=0.4,
             )
 
@@ -961,9 +1007,9 @@ class VulcainApp(App):
             btn_fermer = RoundedButton(
                 text="Fermer",
                 size_hint_y=0.2,
-                background_color=(0.8, 0.8, 0.8, 1),
+                background_color=(0.384, 0.580, 0.604, 1),
                 font_size=self.sp(25),
-                color=(0, 0, 0, 1),
+                color=(0.090, 0.114, 0.129, 1),
             )
 
             # Ajout des boutons au layout
@@ -978,6 +1024,10 @@ class VulcainApp(App):
                 size_hint=(0.9, 0.5),
                 title_size=self.sp(25),
                 auto_dismiss=False,
+                background="",  
+                background_color=(0.090, 0.114, 0.129, 1), 
+                separator_color=(0.549, 0.788, 0.894, 1),
+                title_color=(1, 1, 1, 1)
             )
 
             # Définition des actions internes au popup
@@ -999,7 +1049,7 @@ class VulcainApp(App):
         else:
             # Comportement de simulation pour le développement sur ordinateur (Desktop)
             self.chemin_image_fusee = "fusee_test.jpg"
-            couleur = "00ff00"
+            couleur = "4db8de"
             texte = "FUSÉE SCANNÉE !"
             self.fusee_scannee = 1
             self.texte_base = texte
@@ -1184,7 +1234,7 @@ class VulcainApp(App):
 
             # Si tout est OK, stockage du chemin et mise à jour de l'UI
             self.chemin_image_fusee = file_path
-            couleur = "00ff00"
+            couleur = "4db8de"
             texte = "FUSÉE SCANNÉE !"
             self.texte_base = texte
             self.couleur = couleur
@@ -1265,7 +1315,7 @@ class VulcainApp(App):
             markup=True,
             size_hint_y=None,
             height=self.sp(50),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(label_calcul)
 
@@ -1281,7 +1331,7 @@ class VulcainApp(App):
             font_size=self.sp(25),
             size_hint_y=None,
             height=self.sp(40),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(label_pourcentage)
 
@@ -1296,6 +1346,10 @@ class VulcainApp(App):
             content=root,
             size_hint=(0.8, None),
             auto_dismiss=False,
+            background="",  
+            background_color=(0.090, 0.114, 0.129, 1), 
+            separator_color=(0.549, 0.788, 0.894, 1),
+            title_color=(1, 1, 1, 1)
         )
 
         # Calcul final de la mise en page
@@ -1348,7 +1402,7 @@ class VulcainApp(App):
 
             # Fonction interne pour notifier le succès sur le thread principal
             def update_ui_success(dt):
-                couleur = "00ff00"
+                couleur = "4db8de"
                 texte = "DONNÉES EXTRAITES !"
                 self.fusee_dimensions = 1
                 self.texte_base = texte
@@ -1417,7 +1471,7 @@ class VulcainApp(App):
         section_ogive = Label(
             text="[b][u]OGIVE[/u][/b]",
             font_size=self.sp(32),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             height=self.sp(44),
             markup=True,
@@ -1442,7 +1496,7 @@ class VulcainApp(App):
             data_label = Label(
                 text=f"{label_text} : [b]{value} {unit}[/b]",
                 font_size=self.sp(25),
-                color=(0, 0, 0, 1),
+                color=(0.090, 0.114, 0.129, 1),
                 size_hint_y=None,
                 height=self.sp(35),
                 markup=True,
@@ -1460,7 +1514,7 @@ class VulcainApp(App):
         section_transitions = Label(
             text="[b][u]CORPS[/u][/b]",
             font_size=self.sp(32),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             height=self.sp(44),
             markup=True,
@@ -1476,7 +1530,7 @@ class VulcainApp(App):
             data_label = Label(
                 text=f"{label_text} : [b]{value} {unit}[/b]",
                 font_size=self.sp(25),
-                color=(0, 0, 0, 1),
+                color=(0.090, 0.114, 0.129, 1),
                 size_hint_y=None,
                 height=self.sp(35),
                 markup=True,
@@ -1510,7 +1564,7 @@ class VulcainApp(App):
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
                     font_size=self.sp(25),
-                    color=(0, 0, 0, 1),
+                    color=(0.090, 0.114, 0.129, 1),
                     size_hint_y=None,
                     height=self.sp(32),
                     markup=True,
@@ -1543,7 +1597,7 @@ class VulcainApp(App):
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
                     font_size=self.sp(25),
-                    color=(0, 0, 0, 1),
+                    color=(0.090, 0.114, 0.129, 1),
                     size_hint_y=None,
                     height=self.sp(32),
                     markup=True,
@@ -1575,7 +1629,7 @@ class VulcainApp(App):
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
                     font_size=self.sp(25),
-                    color=(0, 0, 0, 1),
+                    color=(0.090, 0.114, 0.129, 1),
                     size_hint_y=None,
                     height=self.sp(32),
                     markup=True,
@@ -1592,7 +1646,7 @@ class VulcainApp(App):
         section_ailerons = Label(
             text="[b][u]AILERONS[/u][/b]",
             font_size=self.sp(32),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             height=self.sp(44),
             markup=True,
@@ -1616,7 +1670,7 @@ class VulcainApp(App):
                 data_label = Label(
                     text=f"{label_text} : [b]{value} {unit}[/b]",
                     font_size=self.sp(25),
-                    color=(0, 0, 0, 1),
+                    color=(0.090, 0.114, 0.129, 1),
                     size_hint_y=None,
                     height=self.sp(32),
                     markup=True,
@@ -1638,9 +1692,9 @@ class VulcainApp(App):
             text="Fermer",
             size_hint_y=None,
             height=self.sp(60),
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(btn_fermer)
 
@@ -1651,13 +1705,17 @@ class VulcainApp(App):
             size_hint=(0.9, None),
             title_size=self.sp(25),
             auto_dismiss=False,
+            background="",  
+            background_color=(0.090, 0.114, 0.129, 1), 
+            separator_color=(0.549, 0.788, 0.894, 1),
+            title_color=(1, 1, 1, 1)
         )
         content.do_layout()
         # Ajustement de la hauteur du popup selon le contenu sans dépasser l'écran
         popup.height = min(content.minimum_height + self.sp(130), Window.height * 0.9)
 
         # Mise à jour du statut global pour l'envoi
-        couleur = "00ff00"
+        couleur = "4db8de"
         texte = "PRÊT POUR L'ENVOI !"
         self.texte_base = texte
         self.couleur = couleur
@@ -1686,7 +1744,7 @@ class VulcainApp(App):
                             self.SPOCK_id, self.SPOCK_key, self.donnees_completes
                         )
                         if sended_to_SPOCK:
-                            couleur = "00ff00"
+                            couleur = "4db8de"
                             texte = "DONNÉES ENVOYÉES !"
                             self.donnees_envoyees = True
                             self.update_buttons_state()
@@ -1735,7 +1793,7 @@ class VulcainApp(App):
         section_utilisation = Label(
             text="[b][u]UTILISATION DE VULCAIN[/u][/b]",
             font_size=self.sp(34),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             height=self.sp(50),
             markup=True,
@@ -1751,7 +1809,7 @@ class VulcainApp(App):
             '5- Cliquez sur [b]"Identification SPOCK"[/b] pour s\'assurer que l\'ID et la KEY ont bien été importés depuis SPOCK. Si ce n\'est pas le cas, vous pouvez les entrer manuellement sans oublier de cliquer sur [b]"Sauvegarder les identifiants"[/b] une fois cela fait.\n\n'
             '6- Cliquez sur [b]"Envoyer les données"[/b] pour transférer les résultats sur SPOCK.\n',
             font_size=self.sp(27),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             halign="left",
             valign="top",
@@ -1765,7 +1823,7 @@ class VulcainApp(App):
         texte_erreur = Label(
             text='[i][color=cc0000]En cas d\'erreur ou si vous souhaitez recommencer, cliquez sur [b]"Réinitialiser"[/b] et reprennez les étapes depuis le point 1.[/i][/color]',
             font_size=self.sp(27),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             halign="center",
             valign="top",
@@ -1782,7 +1840,7 @@ class VulcainApp(App):
         section_prise_vue = Label(
             text="[b][u]PRISE DE VUE[/u][/b]",
             font_size=self.sp(34),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             height=self.sp(50),
             markup=True,
@@ -1802,7 +1860,7 @@ class VulcainApp(App):
             "• La fusée doit être centrée et bien verticale sur l'image\n\n"
             "• Faire en sorte qu'il y ait au moins un aileron dont la surface est parallèle avec le fond",
             font_size=self.sp(27),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             halign="left",
             valign="top",
@@ -1880,7 +1938,7 @@ class VulcainApp(App):
         section_conseils = Label(
             text="[b][u]CONSEILS[/u][/b]",
             font_size=self.sp(34),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             height=self.sp(50),
             markup=True,
@@ -1888,10 +1946,10 @@ class VulcainApp(App):
         content.add_widget(section_conseils)
 
         texte_conseils = Label(
-            text="• Privilégiez l'utilisation de VULCAIN [b]sans le mode économie d'énergie[/b] de votre téléphone activé pour de meilleures performances.\n\n"
-            "• Si vous prenez une photo depuis VULCAIN, inutile d'utiliser la résolution maximale de votre appareil.\n",
+            text="• Privilégiez l'utilisation de Vulcain [b]sans le mode économie d'énergie[/b] de votre téléphone activé pour de meilleures performances.\n\n"
+            "• Si vous prenez une photo depuis Vulcain, inutile d'utiliser la résolution maximale de votre appareil.\n",
             font_size=self.sp(27),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             halign="left",
             valign="top",
@@ -1904,7 +1962,7 @@ class VulcainApp(App):
         texte_conseils2 = Label(
             text="[b][i][color=cc0000]Le mode économie d'énergie activé + une résolution d'image élevée peut provoquer des crashes si vous prenez une photo depuis l'application. Si cela se produit, veuillez appliquer les deux points précédents.[/i][/b][/color]",
             font_size=self.sp(27),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
             size_hint_y=None,
             halign="center",
             valign="top",
@@ -1922,9 +1980,9 @@ class VulcainApp(App):
             text="Fermer",
             size_hint_y=None,
             height=self.sp(60),
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(btn_fermer)
 
@@ -1934,11 +1992,15 @@ class VulcainApp(App):
 
         # Création du popup guide
         popup = Popup(
-            title="Guide VULCAIN",
+            title="Guide Vulcain",
             content=scroll_view,
             size_hint=(0.9, 0.9),
             title_size=self.sp(25),
             auto_dismiss=False,
+            background="",  
+            background_color=(0.090, 0.114, 0.129, 1), 
+            separator_color=(0.549, 0.788, 0.894, 1),
+            title_color=(1, 1, 1, 1)
         )
 
         # Restauration du label d'info
@@ -1957,7 +2019,7 @@ class VulcainApp(App):
 
         # --- Champ ID ---
         id_label = Label(
-            text="ID :", font_size=self.sp(27), color=(0, 0, 0, 1), size_hint_y=0.1
+            text="ID :", font_size=self.sp(27), color=(0.090, 0.114, 0.129, 1), size_hint_y=0.1
         )
         content.add_widget(id_label)
         id_input = TextInput(
@@ -1965,13 +2027,13 @@ class VulcainApp(App):
             font_size=self.sp(27),
             multiline=False,
             size_hint_y=0.1,
-            foreground_color=(0, 0, 0, 1),
+            foreground_color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(id_input)
 
         # --- Champ Key ---
         key_label = Label(
-            text="Key :", font_size=self.sp(27), color=(0, 0, 0, 1), size_hint_y=0.1
+            text="Key :", font_size=self.sp(27), color=(0.090, 0.114, 0.129, 1), size_hint_y=0.1
         )
         content.add_widget(key_label)
         key_input = TextInput(
@@ -1979,7 +2041,7 @@ class VulcainApp(App):
             font_size=self.sp(27),
             multiline=False,
             size_hint_y=0.1,
-            foreground_color=(0, 0, 0, 1),
+            foreground_color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(key_input)
 
@@ -1997,7 +2059,7 @@ class VulcainApp(App):
         btn_sauvegarder = RoundedButton(
             text="Sauvegarder les identifiants",
             size_hint_y=0.1,
-            background_color=(0.2, 0.6, 1, 1),
+            background_color=(0.059, 0.431, 0.992, 1),
             font_size=self.sp(25),
             color=(1, 1, 1, 1),
         )
@@ -2007,9 +2069,9 @@ class VulcainApp(App):
         btn_fermer = RoundedButton(
             text="Fermer",
             size_hint_y=0.1,
-            background_color=(0.8, 0.8, 0.8, 1),
+            background_color=(0.384, 0.580, 0.604, 1),
             font_size=self.sp(25),
-            color=(0, 0, 0, 1),
+            color=(0.090, 0.114, 0.129, 1),
         )
         content.add_widget(btn_fermer)
 
@@ -2019,6 +2081,10 @@ class VulcainApp(App):
             size_hint=(0.9, 0.63),
             title_size=self.sp(25),
             auto_dismiss=False,
+            background="",  
+            background_color=(0.090, 0.114, 0.129, 1), 
+            separator_color=(0.549, 0.788, 0.894, 1),
+            title_color=(1, 1, 1, 1)
         )
 
         def sauvegarder_identifiants(btn_instance):
@@ -2036,7 +2102,7 @@ class VulcainApp(App):
                 self.derniers_identifiants_recus["id"] = self.SPOCK_id
                 self.derniers_identifiants_recus["key"] = self.SPOCK_key
                 message_label.text = (
-                    "[b][color=00FF00]IDENTIFIANTS SAUVEGARDÉS ![/color][/b]"
+                    "[b][color=4db8de]IDENTIFIANTS SAUVEGARDÉS ![/color][/b]"
                 )
                 # AJOUTER CETTE LIGNE ICI :
                 self.update_spock_button_color()
