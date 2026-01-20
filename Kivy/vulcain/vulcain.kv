@@ -1,15 +1,16 @@
 <TextInput>:
     background_normal: ''
     background_active: ''
-    foreground_color: 0, 0, 0, 1
-    cursor_color: 1, 1, 1, 1
+    background_color: 0, 0, 0, 0  # <--- AJOUTER CETTE LIGNE (Transparent)
+    foreground_color: 0.090, 0.114, 0.129, 1
+    cursor_color: 0.95, 0.95, 0.95, 1
     padding: [15, self.height / 2 - self.line_height / 2, 15, 0]
     halign: 'center'
     multiline: False
     
     canvas.before:
         Color:
-            rgba: (0.8, 0.8, 0.8, 1) if not self.focus else (0.9, 0.9, 0.9, 1)
+            rgba: (0.384, 0.580, 0.604, 1) if not self.focus else (0.412, 0.627, 0.655, 1)
         RoundedRectangle:
             pos: self.pos
             size: self.size
@@ -17,15 +18,15 @@
         
         # Forcer la couleur du texte à être dessinée après
         Color:
-            rgba: 0, 0, 0, 1
+            rgba: 0.090, 0.114, 0.129, 1
 
 <Label>:
-    color: (0, 0, 0, 1)
+    color: (0.090, 0.114, 0.129, 1)
 
 <BoxLayout>:
     canvas.before:
         Color:
-            rgba: 1, 1, 1, 1
+            rgba: 0.792, 0.902, 0.898, 1
         Rectangle:
             pos: self.pos
             size: self.size
