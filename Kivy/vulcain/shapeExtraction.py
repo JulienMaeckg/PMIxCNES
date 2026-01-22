@@ -89,7 +89,7 @@ def dimensions(img):
         files = {"file": ("image.jpg", img_bytes, "image/jpeg")}
 
         # Envoi effectif au serveur avec un délai d'attente de 60 secondes
-        response = requests.post(url, files=files, timeout=60)
+        response = requests.post(url, files=files, timeout=30)
 
         # Si le serveur répond avec succès (Code 200)
         if response.status_code == 200:
