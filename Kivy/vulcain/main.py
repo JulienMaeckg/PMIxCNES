@@ -18,8 +18,6 @@ from kivy.app import App
 from urllib.parse import urlparse, parse_qs
 from PIL import Image
 import threading
-import requests
-import tempfile
 import time
 import gc
 import os
@@ -367,6 +365,7 @@ class VulcainApp(App):
         self.texte_base = "EN ATTENTE"
         self.couleur = "000000"
         self.temps = 15.0  # Durée estimée du calcul pour la barre de progression
+        self.debit = 4.5e-6  # nombre de seconde par px
 
         # Définition d'une largeur cible pour l'adaptation de l'interface
         self.reference_width = 550
@@ -467,7 +466,7 @@ class VulcainApp(App):
         # Menu déroulant pour le choix de l'épaisseur (1 à 20 mm)
         self.aileron_bas_epaisseur_spinner = RoundedSpinner(
             text="3",
-            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"),
+            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
             size_hint_x=0.4,
             font_size=self.sp(25),
             background_color=(0.384, 0.580, 0.604, 1),
@@ -515,7 +514,7 @@ class VulcainApp(App):
         # Menu déroulant pour le choix de l'épaisseur (1 à 20 mm)
         self.aileron_haut_epaisseur_spinner = RoundedSpinner(
             text="3",
-            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"),
+            values=("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
             size_hint_x=0.4,
             font_size=self.sp(25),
             background_color=(0.384, 0.580, 0.604, 1),
@@ -1049,6 +1048,14 @@ class VulcainApp(App):
         else:
             # Comportement de simulation pour le développement sur ordinateur (Desktop)
             self.chemin_image_fusee = "fusee_test.jpg"
+            img = Image.open(self.chemin_image_fusee)
+            largeur = min(img.size)
+            hauteur = max(img.size)
+            if hauteur > 2000:
+                largeur = int(largeur * 2000 / hauteur)
+                hauteur = 2000
+            self.temps = self.debit * largeur * hauteur
+            print(f"[TRANSFERT] {self.temps} s")
             couleur = "4db8de"
             texte = "FUSÉE SCANNÉE !"
             self.fusee_scannee = 1
@@ -1113,6 +1120,7 @@ class VulcainApp(App):
                 filechooser.open_file(
                     on_selection=self._on_image_selected_from_galery,
                     filters=["*.jpg", "*.png", "*.jpeg"],
+                    mime_type="image/*"
                 )
             except Exception as e:
                 # Notification en cas d'échec d'ouverture de la galerie
@@ -1234,6 +1242,14 @@ class VulcainApp(App):
 
             # Si tout est OK, stockage du chemin et mise à jour de l'UI
             self.chemin_image_fusee = file_path
+            img = Image.open(self.chemin_image_fusee)
+            largeur = min(img.size)
+            hauteur = max(img.size)
+            if hauteur > 2000:
+                largeur = int(largeur * 2000 / hauteur)
+                hauteur = 2000
+            self.temps = self.debit * largeur * hauteur
+            print(f"[TRANSFERT] {self.temps} s")
             couleur = "4db8de"
             texte = "FUSÉE SCANNÉE !"
             self.texte_base = texte
@@ -1378,7 +1394,7 @@ class VulcainApp(App):
                 progress_bar.value = 100
                 label_pourcentage.text = "100 %"
                 # Fermeture différée pour laisser l'utilisateur voir la fin
-                Clock.schedule_once(lambda dt: popup.dismiss(), 1)
+                Clock.schedule_once(lambda dt: popup.dismiss(), 0.5)
                 return False
 
         # Planification de la mise à jour toutes les 100ms
